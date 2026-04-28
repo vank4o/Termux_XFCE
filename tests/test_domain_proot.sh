@@ -551,4 +551,65 @@ _test_conky_copies_emoji_font() {
 }
 it "NotoColorEmoji를 proot 홈 .fonts에 복사한다" _test_conky_copies_emoji_font
 
+# =============================================================================
+# _install_ubuntu_nimf_deb — deb 다운로드/설치, 멱등성
+# =============================================================================
+
+describe "proot_env — _install_ubuntu_nimf_deb"
+
+_test_nimf_deb_skips_when_installed() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    reset_mock_calls
+
+    # nimf 이미 설치됨 mock
+    proot_exec() {
+        _record_call "proot_exec $*"
+        if [[ "$*" == *"command -v nimf"* ]]; then return 0; fi
+        return 0
+    }
+
+    _install_ubuntu_nimf_deb 2>/dev/null || true
+    # nimf 존재 확인 후 return → wget 호출 없어야 함
+    assert_not_called "wget"
+    cleanup_sandbox "$sb"
+}
+it "nimf 이미 설치 시 건너뛴다" _test_nimf_deb_skips_when_installed
+
+_test_nimf_deb_downloads_all_debs() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    reset_mock_calls
+
+    # nimf 미설치 mock
+    proot_exec() {
+        _record_call "proot_exec $*"
+        if [[ "$*" == *"command -v nimf"* ]]; then return 1; fi
+        return 0
+    }
+
+    _install_ubuntu_nimf_deb 2>/dev/null || true
+    assert_was_called "nimf_1.4.17_arm64-ubuntu.2404.arm64.deb"
+    assert_was_called "nimf-i18n_1.4.17_arm64-ubuntu.2404.arm64.deb"
+    cleanup_sandbox "$sb"
+}
+it "nimf 미설치 시 모든 .deb를 다운로드한다" _test_nimf_deb_downloads_all_debs
+
+_test_nimf_deb_calls_apt_fix() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    reset_mock_calls
+
+    proot_exec() {
+        _record_call "proot_exec $*"
+        if [[ "$*" == *"command -v nimf"* ]]; then return 1; fi
+        return 0
+    }
+
+    _install_ubuntu_nimf_deb 2>/dev/null || true
+    assert_was_called "apt-get install -f -y"
+    cleanup_sandbox "$sb"
+}
+it "deb 설치 후 apt-get install -f로 의존성을 해결한다" _test_nimf_deb_calls_apt_fix
+
 print_results
