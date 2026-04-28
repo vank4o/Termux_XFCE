@@ -351,16 +351,17 @@ EOF
 
 _install_ubuntu_nimf_deb() {
     # nimf이 Ubuntu 공식 repo에 없으므로 GitHub Releases .deb 직접 설치
-    proot_exec bash -c "command -v nimf &>/dev/null && exit 0
-        apt-get install -y --no-install-recommends libglib2.0-0 libgtk-3-0 libdbus-1-3 2>/dev/null || true
-        for deb in ${NIMF_DEBS[*]}; do
-            url=\"${NIMF_DEB_BASE_URL}/\${deb}\"
-            wget -q -O \"/tmp/\${deb}\" \"\$url\" &&
-                dpkg -i \"/tmp/\${deb}\" 2>/dev/null || true
-            rm -f \"/tmp/\${deb}\"
-        done
-        apt-get install -f -y 2>/dev/null || true
-    "
+    proot_exec bash -c "command -v nimf &>/dev/null" && return 0
+
+    proot_exec bash -c "apt-get install -y --no-install-recommends libglib2.0-0 libgtk-3-0 libdbus-1-3 2>/dev/null || true"
+
+    local deb url
+    for deb in "${NIMF_DEBS[@]}"; do
+        url="${NIMF_DEB_BASE_URL}/${deb}"
+        proot_exec bash -c "wget -q -O '/tmp/${deb}' '${url}' && dpkg -i '/tmp/${deb}' 2>/dev/null || true; rm -f '/tmp/${deb}'"
+    done
+
+    proot_exec bash -c "apt-get install -f -y 2>/dev/null || true"
 }
 
 _setup_ubuntu_nimf() {
