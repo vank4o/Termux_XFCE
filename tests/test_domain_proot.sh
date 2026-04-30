@@ -612,4 +612,84 @@ _test_nimf_deb_calls_apt_fix() {
 }
 it "deb 설치 후 apt-get install -f로 의존성을 해결한다" _test_nimf_deb_calls_apt_fix
 
+_test_nimf_deb_uses_sudo_for_dpkg() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    reset_mock_calls
+
+    proot_exec() {
+        _record_call "proot_exec $*"
+        if [[ "$*" == *"command -v nimf"* ]]; then return 1; fi
+        return 0
+    }
+
+    _install_ubuntu_nimf_deb 2>/dev/null || true
+    assert_was_called "sudo dpkg -i"
+    cleanup_sandbox "$sb"
+}
+it "dpkg -i를 sudo로 실행한다" _test_nimf_deb_uses_sudo_for_dpkg
+
+_test_nimf_deb_uses_sudo_for_apt() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    reset_mock_calls
+
+    proot_exec() {
+        _record_call "proot_exec $*"
+        if [[ "$*" == *"command -v nimf"* ]]; then return 1; fi
+        return 0
+    }
+
+    _install_ubuntu_nimf_deb 2>/dev/null || true
+    assert_was_called "sudo apt-get install -y"
+    assert_was_called "sudo apt-get install -f -y"
+    cleanup_sandbox "$sb"
+}
+it "apt-get을 sudo로 실행한다" _test_nimf_deb_uses_sudo_for_apt
+
+# =============================================================================
+# _setup_ubuntu_korean_locale — nimf & 가드
+# =============================================================================
+
+describe "proot_env — _setup_ubuntu_korean_locale nimf 가드"
+
+_test_ubuntu_profile_guards_nimf_exec() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    _make_proot_rootfs "$sb" "ubuntu" "testuser"
+
+    _setup_ubuntu_korean_locale 2>/dev/null || true
+
+    local profile="${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/home/testuser/.profile"
+    # "nimf &" 가 단독으로 있으면 안 됨 — command -v 가드 필요
+    local bare_nimf
+    bare_nimf=$(grep -c '^nimf &$' "$profile" 2>/dev/null || echo 0)
+    assert_eq "0" "$bare_nimf" ".profile에 가드 없는 'nimf &'가 없어야 한다"
+    assert_file_contains "$profile" "command -v nimf"
+    cleanup_sandbox "$sb"
+}
+it ".profile에서 nimf 실행을 command -v로 가드한다" _test_ubuntu_profile_guards_nimf_exec
+
+_test_arch_nimf_profile_guards_nimf_exec() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "archlinux" "testuser"
+    _make_proot_rootfs "$sb" "archlinux" "testuser"
+
+    _install_yay() { return 0; }
+    proot_exec() {
+        _record_call "proot_exec $*"
+        return 0
+    }
+
+    _setup_arch_nimf_or_fcitx5 2>/dev/null || true
+
+    local profile="${PREFIX}/var/lib/proot-distro/installed-rootfs/archlinux/home/testuser/.profile"
+    local bare_nimf
+    bare_nimf=$(grep -c '^nimf &$' "$profile" 2>/dev/null || echo 0)
+    assert_eq "0" "$bare_nimf" ".profile에 가드 없는 'nimf &'가 없어야 한다"
+    assert_file_contains "$profile" "command -v nimf"
+    cleanup_sandbox "$sb"
+}
+it "Arch nimf 성공 시에도 .profile nimf 실행을 가드한다" _test_arch_nimf_profile_guards_nimf_exec
+
 print_results
