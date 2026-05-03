@@ -245,6 +245,27 @@ adb shell "/system/bin/device_config put activity_manager max_phantom_processes 
 
 ---
 
+## 알려진 문제
+
+### Termux:X11 — 앱 전환 후 우클릭 오작동 / 방향키 불가
+
+**증상**: 다른 앱으로 전환했다가 Termux:X11로 돌아오면 터치가 우클릭으로 인식되거나 방향키가 동작하지 않습니다.
+
+**원인**: Android는 앱이 포커스를 잃는 순간 키 릴리스 이벤트 전송을 중단합니다. Alt 키가 X서버 내에서 눌린 채로 고착되어 Alt+클릭 = 우클릭, Alt+방향키 = 오작동이 발생합니다. ([termux-x11 #781](https://github.com/termux/termux-x11/issues/781))
+
+**영구 해결책** (권장):
+> Termux:X11 앱 → 우측 상단 메뉴 → **Preferences → Keyboard → "Capture DEX meta keys" 활성화**
+
+X11이 Alt+Tab을 직접 처리하므로 키 고착 자체가 발생하지 않습니다.
+
+**즉시 우회**:
+- **Alt 키를 한 번 더 누르면** 고착 해제
+- **Super+I** 단축키로 수동 입력 리셋 (Alt/Shift/Ctrl 고착 해제 + 포인터 버튼 초기화)
+
+> 세션 시작 시 `fix-x11-input` autostart가 자동으로 입력 상태를 초기화합니다.
+
+---
+
 ## 파일 구조
 
 ```
