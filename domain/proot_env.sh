@@ -67,15 +67,31 @@ setup_proot_base_packages() {
     # 패키지 목록 선택은 도메인 지식 (distro별 패키지명이 다름)
     case "$PROOT_DISTRO" in
         ubuntu)
-            for p in "${PKGS_PROOT_UBUNTU_BASE[@]}" "${PKGS_PROOT_UBUNTU_DESKTOP[@]}"; do
-                proot_pkg_is_installed "$p" || proot_pkg_install "$p"
+            local -a _pkgs=("${PKGS_PROOT_UBUNTU_BASE[@]}" "${PKGS_PROOT_UBUNTU_DESKTOP[@]}")
+            local _total=${#_pkgs[@]} _i=0
+            for p in "${_pkgs[@]}"; do
+                ((_i++))
+                if proot_pkg_is_installed "$p"; then
+                    ui_info "  (${_i}/${_total}) ${p} — 이미 설치됨"
+                else
+                    ui_info "  (${_i}/${_total}) ${p} 설치 중..."
+                    proot_pkg_install "$p"
+                fi
             done
             ;;
         archlinux)
-            for p in "${PKGS_PROOT_ARCH_BASE[@]}" "${PKGS_PROOT_ARCH_DESKTOP[@]}"; do
-                # proot 내부 systemd/udev hook 실패(exit 1)는 패키지 설치 자체와 무관 → 무시
-                proot_pkg_is_installed "$p" || proot_pkg_install "$p" || \
-                    echo "[WARN] $p: pacman hook 오류 (패키지는 설치됨)" >&2
+            local -a _pkgs=("${PKGS_PROOT_ARCH_BASE[@]}" "${PKGS_PROOT_ARCH_DESKTOP[@]}")
+            local _total=${#_pkgs[@]} _i=0
+            for p in "${_pkgs[@]}"; do
+                ((_i++))
+                if proot_pkg_is_installed "$p"; then
+                    ui_info "  (${_i}/${_total}) ${p} — 이미 설치됨"
+                else
+                    ui_info "  (${_i}/${_total}) ${p} 설치 중..."
+                    # proot 내부 systemd/udev hook 실패(exit 1)는 패키지 설치 자체와 무관 → 무시
+                    proot_pkg_install "$p" || \
+                        echo "[WARN] $p: pacman hook 오류 (패키지는 설치됨)" >&2
+                fi
             done
             ;;
     esac
@@ -86,17 +102,31 @@ setup_proot_korean() {
 
     case "$PROOT_DISTRO" in
         ubuntu)
+            local _total=${#PKGS_PROOT_UBUNTU_KOREAN[@]} _i=0
             for p in "${PKGS_PROOT_UBUNTU_KOREAN[@]}"; do
-                proot_pkg_is_installed "$p" || proot_pkg_install "$p"
+                ((_i++))
+                if proot_pkg_is_installed "$p"; then
+                    ui_info "  (${_i}/${_total}) ${p} — 이미 설치됨"
+                else
+                    ui_info "  (${_i}/${_total}) ${p} 설치 중..."
+                    proot_pkg_install "$p"
+                fi
             done
             _install_ubuntu_nimf_deb
             _setup_ubuntu_korean_locale
             _setup_ubuntu_nimf
             ;;
         archlinux)
+            local _total=${#PKGS_PROOT_ARCH_KOREAN[@]} _i=0
             for p in "${PKGS_PROOT_ARCH_KOREAN[@]}"; do
-                proot_pkg_is_installed "$p" || proot_pkg_install "$p" || \
-                    echo "[WARN] $p: 설치 오류 (계속 진행)" >&2
+                ((_i++))
+                if proot_pkg_is_installed "$p"; then
+                    ui_info "  (${_i}/${_total}) ${p} — 이미 설치됨"
+                else
+                    ui_info "  (${_i}/${_total}) ${p} 설치 중..."
+                    proot_pkg_install "$p" || \
+                        echo "[WARN] $p: 설치 오류 (계속 진행)" >&2
+                fi
             done
             _setup_arch_nimf_or_fcitx5
             _setup_arch_korean_locale
@@ -386,9 +416,16 @@ _setup_arch_nimf_or_fcitx5() {
 
     if ! $use_nimf; then
         ui_warn "nimf AUR 빌드 실패 → fcitx5로 폴백"
+        local _total=${#PKGS_PROOT_ARCH_KOREAN_FCITX5[@]} _i=0
         for p in "${PKGS_PROOT_ARCH_KOREAN_FCITX5[@]}"; do
-            proot_pkg_is_installed "$p" || proot_pkg_install "$p" || \
-                echo "[WARN] $p: 설치 오류 (계속 진행)" >&2
+            ((_i++))
+            if proot_pkg_is_installed "$p"; then
+                ui_info "  (${_i}/${_total}) ${p} — 이미 설치됨"
+            else
+                ui_info "  (${_i}/${_total}) ${p} 설치 중..."
+                proot_pkg_install "$p" || \
+                    echo "[WARN] $p: 설치 오류 (계속 진행)" >&2
+            fi
         done
     fi
 

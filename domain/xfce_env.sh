@@ -19,8 +19,16 @@ setup_xfce_packages() {
     # pkg install 중에 ~/Desktop에 .desktop 파일을 복사하려 시도하기 때문
     mkdir -p "$HOME/Desktop"
 
-    for p in "${PKGS_TERMUX_XFCE[@]}" "${PKGS_TERMUX_CLI[@]}"; do
-        pkg_is_installed "$p" || pkg_install "$p"
+    local -a _pkgs=("${PKGS_TERMUX_XFCE[@]}" "${PKGS_TERMUX_CLI[@]}")
+    local total=${#_pkgs[@]} i=0
+    for p in "${_pkgs[@]}"; do
+        ((i++))
+        if pkg_is_installed "$p"; then
+            ui_info "  (${i}/${total}) ${p} — 이미 설치됨"
+        else
+            ui_info "  (${i}/${total}) ${p} 설치 중..."
+            pkg_install "$p"
+        fi
     done
 
     # Firefox 데스크탑 아이콘

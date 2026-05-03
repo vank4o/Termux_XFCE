@@ -30,16 +30,30 @@ setup_termux_base() {
 
 setup_termux_gpu() {
     ui_info "GPU 가속(mesa, Adreno) 설치"
+    local total=${#PKGS_TERMUX_GPU[@]} i=0
     for p in "${PKGS_TERMUX_GPU[@]}"; do
-        pkg_is_installed "$p" || pkg_install "$p"
+        ((i++))
+        if pkg_is_installed "$p"; then
+            ui_info "  (${i}/${total}) ${p} — 이미 설치됨"
+        else
+            ui_info "  (${i}/${total}) ${p} 설치 중..."
+            pkg_install "$p"
+        fi
     done
     _detect_and_log_gpu
 }
 
 setup_termux_gpu_dev() {
     ui_info "GPU 개발 도구(clvk 등) 설치"
+    local total=${#PKGS_TERMUX_GPU_DEV[@]} i=0
     for p in "${PKGS_TERMUX_GPU_DEV[@]}"; do
-        pkg_is_installed "$p" || pkg_install "$p"
+        ((i++))
+        if pkg_is_installed "$p"; then
+            ui_info "  (${i}/${total}) ${p} — 이미 설치됨"
+        else
+            ui_info "  (${i}/${total}) ${p} 설치 중..."
+            pkg_install "$p"
+        fi
     done
 }
 
@@ -48,8 +62,15 @@ setup_termux_korean() {
     pkg_is_installed "tur-repo" || pkg_install tur-repo
     _setup_tur_multilib
 
+    local total=${#PKGS_TERMUX_KOREAN[@]} i=0
     for p in "${PKGS_TERMUX_KOREAN[@]}"; do
-        pkg_is_installed "$p" || pkg_install "$p"
+        ((i++))
+        if pkg_is_installed "$p"; then
+            ui_info "  (${i}/${total}) ${p} — 이미 설치됨"
+        else
+            ui_info "  (${i}/${total}) ${p} 설치 중..."
+            pkg_install "$p"
+        fi
     done
     _cleanup_duplicate_fcitx_autostart
     _setup_korean_env
@@ -175,8 +196,15 @@ _install_base_packages() {
     # 실기기에서 검증된 동작이므로 순서 변경 금지 — 구조 개선 전엔 현 상태 유지
     pkg_is_installed "dbus" && pkg_remove dbus
 
+    local total=${#all_pkgs[@]} i=0
     for p in "${all_pkgs[@]}"; do
-        pkg_is_installed "$p" || pkg_install "$p"
+        ((i++))
+        if pkg_is_installed "$p"; then
+            ui_info "  (${i}/${total}) ${p} — 이미 설치됨"
+        else
+            ui_info "  (${i}/${total}) ${p} 설치 중..."
+            pkg_install "$p"
+        fi
     done
 }
 
