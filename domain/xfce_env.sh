@@ -86,9 +86,12 @@ _install_whitesur_theme() {
     local zip="2024-11-18.zip"
     # 잔류 파일 정리 후 다운로드
     rm -rf "WhiteSur-gtk-theme-2024-11-18" "WhiteSur-Dark" "$zip"
-    wget -q "https://github.com/vinceliuice/WhiteSur-gtk-theme/archive/refs/tags/${zip}" -O "$zip"
-    unzip -o -q "$zip"   # -o: 기존 파일 덮어쓰기 (프롬프트 없음)
-    tar -xf "WhiteSur-gtk-theme-2024-11-18/release/WhiteSur-Dark.tar.xz"
+    wget -q "https://github.com/vinceliuice/WhiteSur-gtk-theme/archive/refs/tags/${zip}" -O "$zip" \
+        || { ui_warn "WhiteSur 테마 다운로드 실패"; rm -f "$zip"; return 1; }
+    unzip -o -q "$zip" \
+        || { ui_warn "WhiteSur 테마 압축 해제 실패"; rm -f "$zip"; return 1; }
+    tar -xf "WhiteSur-gtk-theme-2024-11-18/release/WhiteSur-Dark.tar.xz" \
+        || { ui_warn "WhiteSur 테마 tar 해제 실패"; rm -rf "WhiteSur-gtk-theme-2024-11-18" "$zip"; return 1; }
     mv WhiteSur-Dark/ "$PREFIX/share/themes/"
     rm -rf "WhiteSur-gtk-theme-2024-11-18" "$zip"
 }
@@ -99,8 +102,10 @@ _install_fluent_cursor() {
 
     local zip="2024-02-25.zip"
     rm -rf "Fluent-icon-theme-2024-02-25" "$zip"
-    wget -q "https://github.com/vinceliuice/Fluent-icon-theme/archive/refs/tags/${zip}" -O "$zip"
-    unzip -o -q "$zip"   # -o: 덮어쓰기
+    wget -q "https://github.com/vinceliuice/Fluent-icon-theme/archive/refs/tags/${zip}" -O "$zip" \
+        || { ui_warn "Fluent 커서 다운로드 실패"; rm -f "$zip"; return 1; }
+    unzip -o -q "$zip" \
+        || { ui_warn "Fluent 커서 압축 해제 실패"; rm -f "$zip"; return 1; }
     mv "Fluent-icon-theme-2024-02-25/cursors/dist"      "$PREFIX/share/icons/"
     mv "Fluent-icon-theme-2024-02-25/cursors/dist-dark" "$PREFIX/share/icons/"
     rm -rf "Fluent-icon-theme-2024-02-25" "$zip"
@@ -110,8 +115,10 @@ _install_cascadia_code() {
     [ -f "$HOME/.fonts/CascadiaCode.otf" ] && return 0
 
     local zip="CascadiaCode-2111.01.zip"
-    wget -q "https://github.com/microsoft/cascadia-code/releases/download/v2111.01/${zip}" -O "$zip"
-    unzip -q "$zip"
+    wget -q "https://github.com/microsoft/cascadia-code/releases/download/v2111.01/${zip}" -O "$zip" \
+        || { ui_warn "CascadiaCode 폰트 다운로드 실패"; rm -f "$zip"; return 1; }
+    unzip -q "$zip" \
+        || { ui_warn "CascadiaCode 폰트 압축 해제 실패"; rm -f "$zip"; return 1; }
     mv otf/static/*.otf "$HOME/.fonts/" 2>/dev/null || true
     mv ttf/*.ttf       "$HOME/.fonts/" 2>/dev/null || true
     rm -rf otf/ ttf/ woff2/ "$zip"
@@ -122,20 +129,24 @@ _install_meslo_nerd() {
     # (family: "MesloLGS Nerd Font" / "MesloLGS Nerd Font Mono")
     [ -f "$HOME/.fonts/MesloLGSNerdFont-Regular.ttf" ] && return 0
 
-    wget -q "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/Meslo.zip" -O Meslo.zip
-    unzip -q Meslo.zip -d meslo_tmp
+    wget -q "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/Meslo.zip" -O Meslo.zip \
+        || { ui_warn "Meslo Nerd Font 다운로드 실패"; rm -f Meslo.zip; return 1; }
+    unzip -q Meslo.zip -d meslo_tmp \
+        || { ui_warn "Meslo Nerd Font 압축 해제 실패"; rm -f Meslo.zip; return 1; }
     mv meslo_tmp/*.ttf "$HOME/.fonts/" 2>/dev/null || true
     rm -rf meslo_tmp/ Meslo.zip LICENSE.txt readme.md 2>/dev/null || true
 }
 
 _install_noto_emoji() {
     [ -f "$HOME/.fonts/NotoColorEmoji-Regular.ttf" ] && return 0
-    wget -q "${REPO_BASE}/NotoColorEmoji-Regular.ttf" -O "$HOME/.fonts/NotoColorEmoji-Regular.ttf"
+    wget -q "${REPO_BASE}/NotoColorEmoji-Regular.ttf" -O "$HOME/.fonts/NotoColorEmoji-Regular.ttf" \
+        || { ui_warn "Noto Emoji 폰트 다운로드 실패"; rm -f "$HOME/.fonts/NotoColorEmoji-Regular.ttf"; return 1; }
 }
 
 _install_termux_font() {
     [ -f "$HOME/.termux/font.ttf" ] && return 0
-    wget -q "${REPO_BASE}/font.ttf" -O "$HOME/.termux/font.ttf"
+    wget -q "${REPO_BASE}/font.ttf" -O "$HOME/.termux/font.ttf" \
+        || { ui_warn "Termux 폰트 다운로드 실패"; rm -f "$HOME/.termux/font.ttf"; return 1; }
 }
 
 _install_fancybash() {
