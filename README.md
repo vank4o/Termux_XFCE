@@ -253,14 +253,14 @@ Without this, Android throttles CPU usage in the background, causing frame drops
 
 **Root Cause**: Android stops sending key-release events the moment an app loses focus. The Alt key gets stuck in a pressed state inside the X server — Alt+click = right-click, Alt+arrow = unexpected behavior. ([termux-x11 #781](https://github.com/termux/termux-x11/issues/781))
 
-**Permanent Fix** (recommended):
-> Termux:X11 app → top-right menu → **Preferences → Keyboard → enable "Capture DEX meta keys"**
+**No complete fix available**: Android's API does not support selective key interception, so there is no script-level solution. ([termux-x11 #253](https://github.com/termux/termux-x11/issues/253))
 
-This makes X11 handle Alt+Tab directly, preventing the key from ever getting stuck.
+> **Samsung DeX devices only**: Termux:X11 → Preferences → Keyboard → enable **"Intercept system shortcuts"** for a proper fix. This option is hidden on standard Android devices.
 
-**Quick Workarounds**:
-- **Press Alt once** to release the stuck key
+**Workarounds**:
+- **Press Alt once** to release the stuck key (fastest)
 - **Super+I** shortcut for manual input reset (clears stuck Alt/Shift/Ctrl + resets pointer button map)
+- Switch apps via **swipe gesture** instead of Alt+Tab — the bug does not occur
 
 > The `fix-x11-input` autostart entry runs automatically at session start to initialize input state.
 
