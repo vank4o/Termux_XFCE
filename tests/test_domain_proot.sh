@@ -670,6 +670,20 @@ _test_ubuntu_profile_guards_nimf_exec() {
 }
 it ".profile에서 nimf 실행을 command -v로 가드한다" _test_ubuntu_profile_guards_nimf_exec
 
+_test_ubuntu_profile_nimf_uses_disown() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    _make_proot_rootfs "$sb" "ubuntu" "testuser"
+
+    _setup_ubuntu_korean_locale 2>/dev/null || true
+
+    local profile="${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/home/testuser/.profile"
+    assert_file_contains "$profile" "disown" \
+        ".profile의 nimf 백그라운드 실행에 disown이 있어야 한다"
+    cleanup_sandbox "$sb"
+}
+it ".profile의 nimf 백그라운드 실행에 disown을 포함한다 (job 완료 메시지 억제)" _test_ubuntu_profile_nimf_uses_disown
+
 _test_arch_nimf_profile_guards_nimf_exec() {
     local sb; sb=$(make_sandbox)
     _load_domain "$sb" "archlinux" "testuser"
@@ -691,5 +705,38 @@ _test_arch_nimf_profile_guards_nimf_exec() {
     cleanup_sandbox "$sb"
 }
 it "Arch nimf 성공 시에도 .profile nimf 실행을 가드한다" _test_arch_nimf_profile_guards_nimf_exec
+
+_test_arch_nimf_profile_uses_disown() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "archlinux" "testuser"
+    _make_proot_rootfs "$sb" "archlinux" "testuser"
+
+    _install_yay() { return 0; }
+    proot_exec() { _record_call "proot_exec $*"; return 0; }
+
+    _setup_arch_nimf_or_fcitx5 2>/dev/null || true
+
+    local profile="${PREFIX}/var/lib/proot-distro/installed-rootfs/archlinux/home/testuser/.profile"
+    assert_file_contains "$profile" "disown" \
+        ".profile의 nimf 백그라운드 실행에 disown이 있어야 한다"
+    cleanup_sandbox "$sb"
+}
+it "Arch nimf 성공 시 .profile nimf 백그라운드 실행에 disown을 포함한다" _test_arch_nimf_profile_uses_disown
+
+_test_arch_fcitx5_profile_uses_disown() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "archlinux" "testuser"
+    _make_proot_rootfs "$sb" "archlinux" "testuser"
+
+    _install_yay() { return 1; }  # nimf 빌드 실패 → fcitx5 폴백
+
+    _setup_arch_nimf_or_fcitx5 2>/dev/null || true
+
+    local profile="${PREFIX}/var/lib/proot-distro/installed-rootfs/archlinux/home/testuser/.profile"
+    assert_file_contains "$profile" "disown" \
+        ".profile의 fcitx5 백그라운드 실행에 disown이 있어야 한다"
+    cleanup_sandbox "$sb"
+}
+it "Arch fcitx5 폴백 시 .profile fcitx5 백그라운드 실행에 disown을 포함한다" _test_arch_fcitx5_profile_uses_disown
 
 print_results
