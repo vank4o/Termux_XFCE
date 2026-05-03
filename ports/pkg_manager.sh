@@ -72,3 +72,27 @@ _pkg_manager_check() {
 #   인자: $1 = 패키지 이름
 #   반환: 0=설치됨, 1=미설치
 # proot_pkg_is_installed() { ... }
+
+# proot_exec_root <cmd...>
+#   설명: proot 내에서 root 권한으로 명령 실행 (사용자 생성 전/패키지 업데이트 등)
+#   인자: $@ = 실행할 명령
+#   환경변수: PROOT_DISTRO 필요
+#   반환: 명령의 exit code
+# proot_exec_root() { ... }
+
+# proot_pkg_update
+#   설명: proot 내부 패키지 목록 업데이트 및 전체 업그레이드
+#   인자: 없음
+#   반환: 0=성공, 1=실패
+# proot_pkg_update() { ... }
+
+# proot_pkg_remove <package...>
+#   설명: proot 내부 패키지 제거
+#   인자: $@ = 패키지 이름 목록
+#   반환: 0=성공, 1=실패
+# proot_pkg_remove() { ... }
+
+# proot_pkg_autoremove
+#   설명: proot 내부 불필요한 의존성 패키지 제거
+#   인자: 없음
+# proot_pkg_autoremove() { ... }

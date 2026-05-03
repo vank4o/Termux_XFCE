@@ -37,6 +37,11 @@ proot_exec() {
     return 1
 }
 
+proot_exec_root() {
+    echo "[ERROR] pkg_termux: proot_exec_root는 proot 어댑터에서만 사용 가능합니다." >&2
+    return 1
+}
+
 proot_pkg_install() {
     echo "[ERROR] pkg_termux: proot_pkg_install는 proot 어댑터에서만 사용 가능합니다." >&2
     return 1

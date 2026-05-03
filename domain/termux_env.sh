@@ -98,6 +98,7 @@ _append_to_rc() {
     local marker="$1"
     local content="$2"
     local file="$3"
+    [ -f "$file" ] || return 0  # 파일 없으면 건너뜀 (silent failure 방지)
     grep -q "$marker" "$file" 2>/dev/null || printf '%s\n' "$content" >> "$file"
 }
 
@@ -673,6 +674,9 @@ _migrate_desktop_to_prun_gui() {
         grep -q "prun " "$f" 2>/dev/null || continue
         app_name=$(grep -m1 '^Name=' "$f" | cut -d= -f2-)
         app_name="${app_name:-App}"
+        # sed 구분자(|)와 작은따옴표 충돌 방지
+        app_name="${app_name//\'/\'\\\'\'}"
+        app_name="${app_name//|/\\|}"
         sed -i "s|\"prun |\"prun-gui '${app_name}' -- |g" "$f"
     done
 }
@@ -759,6 +763,9 @@ if [[ "$action" == "Copy .desktop file" ]]; then
     cp "$selected" "$PREFIX/share/applications/"
     app_name=$(grep -m1 '^Name=' "$PREFIX/share/applications/$filename" | cut -d= -f2-)
     app_name="${app_name:-App}"
+    # sed 구분자(|)와 작은따옴표 충돌 방지
+    app_name="${app_name//\'/\'\\\'\'}"
+    app_name="${app_name//|/\\|}"
     sed -i "s|^Exec=\(.*\)$|Exec=bash -c \"prun-gui '${app_name}' -- \1 </dev/null >/dev/null 2>\&1 \&\"|" \
         "$PREFIX/share/applications/$filename"
     zenity --info --text="복사 완료: $filename"

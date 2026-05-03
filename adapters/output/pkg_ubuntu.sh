@@ -69,7 +69,7 @@ proot_pkg_remove() {
 }
 
 proot_pkg_is_installed() {
-    proot_exec dpkg -l "$1" 2>/dev/null | grep -q "^ii"
+    proot_exec dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "^install ok installed"
 }
 
 proot_pkg_autoremove() {
