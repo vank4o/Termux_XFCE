@@ -211,8 +211,8 @@ _setup_autostart_config() {
 _migrate_fix_x11_input() {
     local src="${SCRIPT_DIR}/tar/config/.config/autostart/fix-x11-input.desktop"
     local dst="$HOME/.config/autostart/fix-x11-input.desktop"
-    [ -f "$dst" ] && return 0  # 이미 있으면 건너뜀
     [ -f "$src" ] || return 0  # 소스 없으면 건너뜀
+    # 항상 덮어씀 — xdotool alt 고착 해제 등 내용이 업데이트될 수 있음
     cp "$src" "$dst"
 }
 
