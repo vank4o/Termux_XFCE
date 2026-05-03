@@ -25,6 +25,7 @@
       <property name="&lt;Super&gt;e" type="empty"/>
       <property name="&lt;Primary&gt;&lt;Alt&gt;f" type="empty"/>
       <property name="&lt;Primary&gt;&lt;Alt&gt;Escape" type="empty"/>
+      <property name="&lt;Super&gt;i" type="empty"/>
       <property name="&lt;Primary&gt;&lt;Shift&gt;Escape" type="empty"/>
       <property name="&lt;Super&gt;r" type="empty">
         <property name="startup-notify" type="empty"/>
@@ -59,6 +60,7 @@
       <property name="&lt;Primary&gt;&lt;Alt&gt;Escape" type="string" value="xkill"/>
       <property name="HomePage" type="string" value="exo-open --launch WebBrowser"/>
       <property name="XF86Display" type="string" value="xfce4-display-settings --minimal"/>
+      <property name="&lt;Super&gt;i" type="string" value="bash -c 'xinput set-button-map &quot;Virtual core pointer&quot; 1 2 3 4 5 6 7 8 9 10 11 12 13 2&gt;/dev/null; xset r rate 300 30 2&gt;/dev/null; setxkbmap -option 2&gt;/dev/null'"/>
       <property name="override" type="bool" value="true"/>
     </property>
   </property>
