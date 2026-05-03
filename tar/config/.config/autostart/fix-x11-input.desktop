@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Fix X11 Input
+# Termux:X11에서 다른 앱으로 전환 후 돌아왔을 때 발생하는 입력 오류 방지
+# - 포인터 버튼 매핑 초기화 (터치 → 우클릭 오작동 수정)
+# - 키보드 수식키 고착 해제
+# - 키보드 반복 속도 설정
+Exec=bash -c 'sleep 5; \
+  xinput set-button-map "Virtual core pointer" 1 2 3 4 5 6 7 8 9 10 11 12 13 2>/dev/null || true; \
+  xset r rate 300 30 2>/dev/null || true; \
+  setxkbmap -option 2>/dev/null || true'
+X-GNOME-Autostart-enabled=true
+NoDisplay=true
+StartupNotify=false
+Terminal=false

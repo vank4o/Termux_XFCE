@@ -76,6 +76,7 @@ setup_xfce_fancybash() {
 setup_xfce_autostart() {
     ui_info "자동시작 설정 (Conky, Flameshot)"
     _setup_autostart_config
+    _migrate_fix_x11_input
     _migrate_flameshot_native
     _migrate_terminal_font
 }
@@ -204,6 +205,17 @@ _setup_autostart_config() {
 # Note: "MesloLGS NF"는 romkatv/p10k-media 전용 이름이며 ryanoasis Meslo.zip의 family는
 #       "MesloLGS Nerd Font Mono" — fc-match로 확인함 (fallback 방지)
 # Note: xfce4-terminal ≥ 1.1은 terminalrc → xfconf xml로 이관됨 → 양쪽 모두 갱신
+# Termux:X11 포커스 복귀 시 입력 오류 수정용 autostart 추가
+# Why: 다른 앱 전환 후 X11로 돌아오면 터치→우클릭 오작동, 방향키 불가 현상 발생
+#      _setup_autostart_config의 cp -rn + 멱등 가드로 기존 설치본에는 반영 안 됨
+_migrate_fix_x11_input() {
+    local src="${SCRIPT_DIR}/tar/config/.config/autostart/fix-x11-input.desktop"
+    local dst="$HOME/.config/autostart/fix-x11-input.desktop"
+    [ -f "$dst" ] && return 0  # 이미 있으면 건너뜀
+    [ -f "$src" ] || return 0  # 소스 없으면 건너뜀
+    cp "$src" "$dst"
+}
+
 # 기존 설치본의 flameshot autostart를 prun → native로 전환
 # Why: 6cb9166에서 flameshot을 Termux native로 이동했으나
 #      _setup_autostart_config의 cp -rn + 멱등 가드로 기존 파일이 업데이트되지 않음
