@@ -339,7 +339,7 @@ LC_ALL=ko_KR.UTF-8
 export GTK_IM_MODULE=nimf
 export QT_IM_MODULE=nimf
 export XMODIFIERS="@im=nimf"
-command -v nimf &>/dev/null && nimf &
+command -v nimf &>/dev/null && { nimf & disown; } 2>/dev/null
 EOF
 
     # /etc/default/locale
@@ -419,7 +419,7 @@ LC_ALL=ko_KR.UTF-8
 export GTK_IM_MODULE=nimf
 export QT_IM_MODULE=nimf
 export XMODIFIERS="@im=nimf"
-command -v nimf &>/dev/null && nimf &
+command -v nimf &>/dev/null && { nimf & disown; } 2>/dev/null
 EOF
     else
         cat >> "$profile" << 'EOF'
@@ -431,7 +431,7 @@ LC_ALL=ko_KR.UTF-8
 export GTK_IM_MODULE=fcitx5
 export QT_IM_MODULE=fcitx5
 export XMODIFIERS="@im=fcitx5"
-fcitx5 -d --replace 2>/dev/null &
+{ fcitx5 -d --replace 2>/dev/null & disown; } 2>/dev/null
 EOF
     fi
 }
