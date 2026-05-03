@@ -34,32 +34,37 @@ setup_xfce_packages() {
 }
 
 setup_xfce_theme() {
+    # 테마/커서는 선택적 — 다운로드 실패 시 경고만 출력하고 계속 진행
     ui_info "WhiteSur-Dark 테마 설치"
-    _install_whitesur_theme
+    _install_whitesur_theme || true
     ui_info "Fluent 커서 아이콘 설치"
-    _install_fluent_cursor
+    _install_fluent_cursor || true
 }
 
 setup_xfce_fonts() {
+    # 폰트는 선택적 — 다운로드 실패 시 경고만 출력하고 계속 진행
     ui_info "폰트 설치 (CascadiaCode, Meslo Nerd, Noto Emoji)"
     mkdir -p "$HOME/.fonts"
-    _install_cascadia_code
-    _install_meslo_nerd
-    _install_noto_emoji
-    _install_termux_font
+    _install_cascadia_code || true
+    _install_meslo_nerd    || true
+    _install_noto_emoji    || true
+    _install_termux_font   || true
     # fontconfig 캐시 갱신: MesloLGS NF 등 신규 폰트를 xfce4-terminal이 FontName으로 찾을 수 있게 함
     command -v fc-cache >/dev/null && fc-cache -f "$HOME/.fonts" 2>/dev/null || true
 }
 
 setup_xfce_wallpaper() {
+    # 배경화면은 선택적 — 다운로드 실패 시 경고만 출력하고 계속 진행
     ui_info "배경화면 다운로드"
     local bg_dir="$PREFIX/share/backgrounds/xfce"
     mkdir -p "$bg_dir"
 
     [ -f "$bg_dir/dark_waves.png" ] || \
-        wget -q "${REPO_BASE}/dark_waves.png" -O "$bg_dir/dark_waves.png"
+        wget -q "${REPO_BASE}/dark_waves.png" -O "$bg_dir/dark_waves.png" \
+        || { ui_warn "dark_waves.png 다운로드 실패"; rm -f "$bg_dir/dark_waves.png"; }
     [ -f "$bg_dir/TheSolarSystem.jpg" ] || \
-        wget -q "${REPO_BASE}/TheSolarSystem.jpg" -O "$bg_dir/TheSolarSystem.jpg"
+        wget -q "${REPO_BASE}/TheSolarSystem.jpg" -O "$bg_dir/TheSolarSystem.jpg" \
+        || { ui_warn "TheSolarSystem.jpg 다운로드 실패"; rm -f "$bg_dir/TheSolarSystem.jpg"; }
 }
 
 setup_xfce_fancybash() {
@@ -78,6 +83,10 @@ setup_xfce_autostart() {
 # -----------------------------------------------------------------------------
 # Private
 # -----------------------------------------------------------------------------
+
+# 주의: 아래 _install_* 함수들은 네트워크(wget)에 의존하므로 단위 테스트 불가.
+# 테스트는 tests/test_domain_xfce.sh의 멱등성 케이스(파일 존재 시 건너뜀)만 커버.
+# 실제 다운로드 경로 검증은 e2e(autopilot) 환경에서만 가능.
 
 _install_whitesur_theme() {
     local theme_dir="$PREFIX/share/themes/WhiteSur-Dark"
@@ -156,7 +165,8 @@ _install_fancybash() {
 
     [ -f "$target" ] && return 0
 
-    wget -q "${REPO_BASE}/fancybash.sh" -O "$target"
+    wget -q "${REPO_BASE}/fancybash.sh" -O "$target" \
+        || { ui_warn "fancybash.sh 다운로드 실패"; rm -f "$target"; return 1; }
 
     # 사용자명/호스트명 치환 (line 326, 327은 원본 기준)
     sed -i "s/\\\\u/${username}/" "$target"
