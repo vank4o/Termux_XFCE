@@ -245,6 +245,27 @@ Without this, Android throttles CPU usage in the background, causing frame drops
 
 ---
 
+## Known Issues
+
+### Termux:X11 — Right-click / Arrow Keys Broken After Switching Apps
+
+**Symptoms**: After switching to another app and returning to Termux:X11, touch input registers as right-click and arrow keys stop working.
+
+**Root Cause**: Android stops sending key-release events the moment an app loses focus. The Alt key gets stuck in a pressed state inside the X server — Alt+click = right-click, Alt+arrow = unexpected behavior. ([termux-x11 #781](https://github.com/termux/termux-x11/issues/781))
+
+**Permanent Fix** (recommended):
+> Termux:X11 app → top-right menu → **Preferences → Keyboard → enable "Capture DEX meta keys"**
+
+This makes X11 handle Alt+Tab directly, preventing the key from ever getting stuck.
+
+**Quick Workarounds**:
+- **Press Alt once** to release the stuck key
+- **Super+I** shortcut for manual input reset (clears stuck Alt/Shift/Ctrl + resets pointer button map)
+
+> The `fix-x11-input` autostart entry runs automatically at session start to initialize input state.
+
+---
+
 ## Project Structure
 
 ```
