@@ -145,43 +145,58 @@ fi
 # 11. 실행 — Termux Native
 # --proot-only 플래그 사용 시 생략 (추가 distro 설치 시 중복 방지)
 # -----------------------------------------------------------------------------
+# 단계 카운터 — 선택 옵션에 따라 총 단계 수 계산
+_step=0
+_total=4  # 기본: base + xfce + shortcuts + x11apk
+[ "${SKIP_KOREAN:-true}" != "true" ] && _total=$((_total + 1))
+[ "${INSTALL_GPU:-false}" = "true" ] && _total=$((_total + 1))
+[ "${SKIP_PROOT:-true}" != "true" ] && [ -n "${PROOT_DISTRO:-}" ] && _total=$((_total + 1))
+_step_msg() { _step=$((_step + 1)); ui_info "=== [${_step}/${_total}] $1 ==="; }
+
 if [ "${PROOT_ONLY:-false}" != "true" ]; then
-    ui_info "=== [1/4] Termux 기본 환경 설정 ==="
+    _step_msg "Termux 기본 환경 설정"
     setup_termux_base
 
-    ui_info "=== [2/4] XFCE 패키지 및 테마 설치 ==="
+    _step_msg "XFCE 데스크탑 설치"
     setup_xfce_packages
+    ui_info "  테마 설치..."
     setup_xfce_theme
+    ui_info "  폰트 설치..."
     setup_xfce_fonts
+    ui_info "  배경화면..."
     setup_xfce_wallpaper
     # zsh가 기본 쉘이면 fancybash 건너뜀 (p10k가 대체)
-    # Termux의 login shell은 ~/.termux/shell 심볼릭 링크로 관리됨
-    # ($SHELL은 현재 스크립트 세션 값이라 chsh 직후 갱신되지 않고, /etc/passwd는 Termux에 없음)
     _login_shell=$(readlink "$HOME/.termux/shell" 2>/dev/null || echo "")
     if [[ "$_login_shell" != */zsh ]]; then
         setup_xfce_fancybash "$PROOT_USER"
     fi
     unset _login_shell
+    ui_info "  자동시작 설정..."
     setup_xfce_autostart
 
-    # 한글 로케일(LD_PRELOAD 기반) — 옵트인: --korean-locale + --locale-zip
+    # 한글 로케일(LD_PRELOAD 기반) — 옵트인
     if [ "${KOREAN_LOCALE:-false}" = "true" ]; then
-        ui_info "=== [XFCE] 한글 로케일 강제 적용 ==="
+        ui_info "  한글 로케일 강제 적용..."
         setup_korean_locale_native
     fi
 
-    ui_info "=== [3/4] 한글 입력기 설치 ==="
-    setup_termux_korean
+    # 한글 입력기 (선택)
+    if [ "${SKIP_KOREAN:-true}" != "true" ]; then
+        _step_msg "한글 입력기(fcitx5) 설치"
+        setup_termux_korean
+    fi
 
-    ui_info "=== [4/4] 유틸리티 설정 (shortcuts, prun, cp2menu) ==="
+    _step_msg "유틸리티 설정 (shortcuts, prun, cp2menu)"
     setup_termux_shortcuts
 
     # GPU 가속 (선택)
     if [ "${INSTALL_GPU:-false}" = "true" ]; then
+        _step_msg "GPU 가속(mesa, Turnip) 설치"
         setup_termux_gpu
-    fi
-    if [ "${INSTALL_GPU_DEV:-false}" = "true" ]; then
-        setup_termux_gpu_dev
+        if [ "${INSTALL_GPU_DEV:-false}" = "true" ]; then
+            ui_info "  GPU 개발 도구 설치..."
+            setup_termux_gpu_dev
+        fi
     fi
 else
     ui_info "[--proot-only] Termux native 설정 생략 — proot 환경만 구성합니다."
@@ -191,18 +206,28 @@ fi
 # 12. 실행 — proot (선택)
 # -----------------------------------------------------------------------------
 if [ "${SKIP_PROOT:-false}" != "true" ] && [ -n "${PROOT_DISTRO:-}" ]; then
-    ui_info "=== [proot] ${PROOT_DISTRO} 환경 구성 ==="
+    _step_msg "${PROOT_DISTRO} proot 환경 구성"
 
+    ui_info "  proot-distro 설치..."
     setup_proot_install
+    ui_info "  패키지 업데이트..."
     setup_proot_update
+    ui_info "  사용자 생성: ${PROOT_USER}..."
     setup_proot_user
+    ui_info "  기본 패키지 설치..."
     setup_proot_base_packages
-    setup_proot_korean
+    if [ "${SKIP_KOREAN:-true}" != "true" ]; then
+        ui_info "  한글 환경 설정..."
+        setup_proot_korean
+    fi
+    ui_info "  환경변수 설정..."
     setup_proot_env
     setup_proot_timezone
     setup_proot_fancybash
+    ui_info "  GPU 설정..."
     setup_proot_hardware_accel
     setup_proot_cursor_theme
+    ui_info "  Conky 설정..."
     setup_proot_conky
     setup_proot_alias
 fi
@@ -211,7 +236,7 @@ fi
 # 13. Termux-X11 APK 설치 (proot-only 시 생략)
 # -----------------------------------------------------------------------------
 if [ "${PROOT_ONLY:-false}" != "true" ]; then
-    ui_info "=== Termux-X11 APK 설치 ==="
+    _step_msg "Termux-X11 APK 설치"
     setup_termux_x11_apk
 fi
 

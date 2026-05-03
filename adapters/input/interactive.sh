@@ -35,6 +35,16 @@ resolve_interactive_inputs() {
         export PROOT_DISTRO SKIP_PROOT
     fi
 
+    # 한글 입력기
+    if [ -z "${SKIP_KOREAN:-}" ]; then
+        if ui_confirm "한글 입력기(fcitx5-hangul)를 설치하겠습니까?"; then
+            SKIP_KOREAN=false
+        else
+            SKIP_KOREAN=true
+        fi
+        export SKIP_KOREAN
+    fi
+
     # GPU 가속
     if [ -z "${INSTALL_GPU:-}" ]; then
         if ui_confirm "GPU 가속(mesa + Turnip Vulkan, Adreno)을 설치하겠습니까?"; then

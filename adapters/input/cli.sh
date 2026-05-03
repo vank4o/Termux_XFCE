@@ -17,6 +17,7 @@ parse_cli_args() {
     export INSTALL_GPU_DEV="${INSTALL_GPU_DEV:-}"
     export SKIP_PROOT="${SKIP_PROOT:-false}"
     export PROOT_ONLY="${PROOT_ONLY:-false}"
+    export SKIP_KOREAN="${SKIP_KOREAN:-}"
     export KOREAN_LOCALE="${KOREAN_LOCALE:-false}"
     export KOREAN_LOCALE_ZIP="${KOREAN_LOCALE_ZIP:-}"
 
@@ -32,8 +33,14 @@ parse_cli_args() {
                 PROOT_ONLY=true; shift ;;
             --gpu)
                 INSTALL_GPU=true; shift ;;
+            --no-gpu)
+                INSTALL_GPU=false; shift ;;
             --gpu-dev)
                 INSTALL_GPU_DEV=true; shift ;;
+            --korean)
+                SKIP_KOREAN=false; shift ;;
+            --no-korean)
+                SKIP_KOREAN=true; shift ;;
             --korean-locale)
                 KOREAN_LOCALE=true; shift ;;
             --locale-zip)
@@ -57,7 +64,10 @@ _cli_usage() {
       --no-proot          Termux native만 설치 (proot 생략)
       --proot-only        proot만 설치 (Termux native 설정 생략, 추가 distro용)
       --gpu               GPU 가속 설치
+      --no-gpu            GPU 가속 생략
       --gpu-dev           GPU 개발 도구 설치
+      --korean            한글 입력기(fcitx5) 설치
+      --no-korean         한글 입력기 생략
       --korean-locale         XFCE 한글 로케일 강제 적용 (LD_PRELOAD 기반)
       --locale-zip <path>     한글 로케일 .mo 카탈로그 zip 경로 (--korean-locale 자동 활성화)
   -h, --help              이 도움말 출력
@@ -68,6 +78,7 @@ _cli_usage() {
   INSTALL_GPU=true        --gpu 와 동일
   SKIP_PROOT=true         --no-proot 와 동일
   PROOT_ONLY=true         --proot-only 와 동일
+  SKIP_KOREAN=true        --no-korean 와 동일
   KOREAN_LOCALE=true      --korean-locale 와 동일
   KOREAN_LOCALE_ZIP=path  --locale-zip 과 동일
 
