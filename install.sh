@@ -51,6 +51,7 @@ trap _on_exit EXIT
 # -----------------------------------------------------------------------------
 source "$SCRIPT_DIR/ports/pkg_manager.sh"
 source "$SCRIPT_DIR/ports/ui.sh"
+source "$SCRIPT_DIR/ports/script_builder.sh"
 
 # -----------------------------------------------------------------------------
 # 3. Output Adapter 선택 — UI
@@ -63,6 +64,9 @@ elif [ -n "${DISPLAY:-}" ] && command -v zenity &>/dev/null; then
 else
     source "$SCRIPT_DIR/adapters/output/ui_terminal.sh"
 fi
+
+# Script Builder 어댑터 — 런타임 스크립트 생성 (zenity 기반)
+source "$SCRIPT_DIR/adapters/output/script_builder_zenity.sh"
 
 # -----------------------------------------------------------------------------
 # 4. Input Adapter — CLI 인자 파싱
@@ -200,59 +204,15 @@ if [ "${SKIP_PROOT:-false}" != "true" ] && [ -n "${PROOT_DISTRO:-}" ]; then
     setup_proot_hardware_accel
     setup_proot_cursor_theme
     setup_proot_conky
-
-    # proot alias (bash.bashrc + ~/.zshrc)
-    # PROOT_SHELL: config에서 읽어 인터랙티브 셸 결정 (bash|zsh, 기본 bash)
-    _proot_alias="alias ${PROOT_DISTRO}='proot-distro login ${PROOT_DISTRO} --user ${PROOT_USER} --shared-tmp -- env -u LD_PRELOAD \${PROOT_SHELL:-bash} --login'"
-    _bashrc="$PREFIX/etc/bash.bashrc"
-    grep -q "alias ${PROOT_DISTRO}=" "$_bashrc" 2>/dev/null || echo "$_proot_alias" >> "$_bashrc"
-    if command -v zsh &>/dev/null && [ -f "$HOME/.zshrc" ]; then
-        grep -q "alias ${PROOT_DISTRO}=" "$HOME/.zshrc" 2>/dev/null || echo "$_proot_alias" >> "$HOME/.zshrc"
-    fi
+    setup_proot_alias
 fi
-
-# -----------------------------------------------------------------------------
-# 내부 함수 — 호출 전에 정의
-# -----------------------------------------------------------------------------
-_install_termux_x11_apk() {
-    local apk_name
-
-    case "$ARCH" in
-        aarch64) apk_name="app-arm64-v8a-debug.apk" ;;
-        x86_64)  apk_name="app-x86_64-debug.apk" ;;
-        *)
-            ui_warn "아키텍처 ${ARCH}용 Termux-X11 APK를 지원하지 않습니다. 수동 설치하세요."
-            return 0
-            ;;
-    esac
-
-    local apk_url="https://github.com/termux/termux-x11/releases/download/nightly/${apk_name}"
-    local dl_dir="$HOME/storage/downloads"
-    local apk_path="${dl_dir}/${apk_name}"
-
-    # storage/downloads가 없으면 HOME에 저장 (termux-setup-storage 미실행 환경)
-    if [ ! -d "$dl_dir" ]; then
-        dl_dir="$HOME"
-        apk_path="${dl_dir}/${apk_name}"
-        ui_warn "storage/downloads 없음 — ${apk_path} 에 저장합니다."
-    fi
-
-    if [ -f "$apk_path" ]; then
-        ui_warn "APK가 이미 다운로드되어 있습니다: ${apk_path}"
-    else
-        wget -q "$apk_url" -O "$apk_path"
-    fi
-
-    termux-open "$apk_path" 2>/dev/null || \
-        ui_warn "APK 자동 열기 실패 — 수동으로 설치하세요: ${apk_path}"
-}
 
 # -----------------------------------------------------------------------------
 # 13. Termux-X11 APK 설치 (proot-only 시 생략)
 # -----------------------------------------------------------------------------
 if [ "${PROOT_ONLY:-false}" != "true" ]; then
     ui_info "=== Termux-X11 APK 설치 ==="
-    _install_termux_x11_apk
+    setup_termux_x11_apk
 fi
 
 # -----------------------------------------------------------------------------

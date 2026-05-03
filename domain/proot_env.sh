@@ -22,21 +22,13 @@ setup_proot_install() {
         ui_warn "${PROOT_DISTRO}가 이미 설치되어 있습니다. 건너뜁니다."
         return 0
     }
-    proot-distro install "$PROOT_DISTRO"
+    proot_install "$PROOT_DISTRO"
 }
 
 setup_proot_update() {
     ui_info "${PROOT_DISTRO} 패키지 업데이트"
     # 사용자 생성 전 단계이므로 root로 실행
-    case "$PROOT_DISTRO" in
-        ubuntu)
-            proot_exec_root apt update
-            proot_exec_root apt upgrade -y -o Dpkg::Options::="--force-confold"
-            ;;
-        archlinux)
-            proot_exec_root pacman -Syu --noconfirm
-            ;;
-    esac
+    proot_pkg_update_root
 }
 
 setup_proot_user() {
@@ -56,35 +48,30 @@ setup_proot_user() {
 
     _setup_proot_sudoers "$username"
 
-    # Arch: sudo가 base에 없음 → 사용자 생성 직후 root로 설치
-    # 이후 proot_exec sudo pacman ... 이 작동하려면 sudo 바이너리가 필요
-    case "${PROOT_DISTRO}" in
-        archlinux)
-            proot_exec_root pacman -S --noconfirm --needed sudo 2>/dev/null || true
-            ;;
-    esac
+    # sudo가 base에 없을 수 있음 → 사용자 생성 직후 root로 설치
+    # 이후 proot_exec sudo ... 이 작동하려면 sudo 바이너리가 필요
+    proot_pkg_install_root sudo 2>/dev/null || true
 }
 
 setup_proot_base_packages() {
     ui_info "${PROOT_DISTRO} 기본 패키지 설치"
 
+    # sudo가 base에 없으면 proot_pkg_install(sudo 기반) 자체가 실패
+    # → root로 먼저 설치 후 sudoers ���구성
+    proot_pkg_install_root sudo 2>/dev/null || true
+    _setup_proot_sudoers "$PROOT_USER"
+
+    # setup_proot_user가 멱등성으로 건너뛴 경우도 있으므로 여기서 항상 보장
+    proot_pkg_update || true  # proot systemd hook 오류 무시
+
+    # 패키지 목록 선택은 도메인 지식 (distro별 패키지명이 다름)
     case "$PROOT_DISTRO" in
         ubuntu)
-            # sudo가 base에 없으면 proot_pkg_install("sudo apt ...") 자체가 실패
-            # → root로 먼저 설치 후 sudoers 재구성
-            proot_exec_root apt install -y sudo 2>/dev/null || true
-            _setup_proot_sudoers "$PROOT_USER"
             for p in "${PKGS_PROOT_UBUNTU_BASE[@]}" "${PKGS_PROOT_UBUNTU_DESKTOP[@]}"; do
                 proot_pkg_is_installed "$p" || proot_pkg_install "$p"
             done
             ;;
         archlinux)
-            # proot_pkg_install 이 "sudo pacman" 을 쓰므로 sudo 바이너리가 먼저 필요.
-            # setup_proot_user 가 멱등성으로 건너뛴 경우도 있으므로 여기서 항상 보장.
-            proot_exec_root pacman -S --noconfirm --needed sudo 2>/dev/null || true
-            # sudo 설치 후 sudoers 재구성 (wheel NOPASSWD + 유저 직접 항목)
-            _setup_proot_sudoers "$PROOT_USER"
-            proot_pkg_update || true  # proot systemd hook 오류 무시
             for p in "${PKGS_PROOT_ARCH_BASE[@]}" "${PKGS_PROOT_ARCH_DESKTOP[@]}"; do
                 # proot 내부 systemd/udev hook 실패(exit 1)는 패키지 설치 자체와 무관 → 무시
                 proot_pkg_is_installed "$p" || proot_pkg_install "$p" || \
@@ -196,20 +183,18 @@ setup_proot_hardware_accel() {
     # proot 내에는 확인용 유틸(glxinfo / vulkaninfo)만 설치.
     ui_info "${PROOT_DISTRO} GPU: Termux Turnip ICD 재사용 + 확인 유틸 설치"
 
+    # 패키지 목록 선택은 도메인 지식 (distro별 패키지명이 다름)
     case "$PROOT_DISTRO" in
         ubuntu)
-            proot_exec sudo apt install -y --no-install-recommends \
-                mesa-utils vulkan-tools 2>/dev/null || \
+            proot_pkg_install mesa-utils vulkan-tools 2>/dev/null || \
                 ui_warn "Ubuntu proot: mesa-utils/vulkan-tools 설치 실패 — 확인 유틸 없이 진행"
-            ui_info "Ubuntu proot GPU: Termux Turnip ICD → Zink 경로 활성화됨"
             ;;
         archlinux)
             # proot systemd hook 실패는 무시 (패키지 자체는 설치됨)
-            proot_exec sudo pacman -S --noconfirm --needed \
-                mesa vulkan-tools mesa-demos 2>/dev/null || true
-            ui_info "Arch proot GPU: Termux Turnip ICD → Zink 경로 활성화됨"
+            proot_pkg_install mesa vulkan-tools mesa-demos 2>/dev/null || true
             ;;
     esac
+    ui_info "${PROOT_DISTRO} proot GPU: Termux Turnip ICD → Zink 경로 활성화됨"
 }
 
 setup_proot_cursor_theme() {
@@ -273,7 +258,7 @@ teardown_proot() {
     ui_info "${distro} proot 제거 중..."
 
     # rootfs 제거
-    proot-distro remove "$distro" 2>/dev/null || true
+    proot_remove "$distro"
 
     # bash.bashrc alias 제거
     local bashrc="$PREFIX/etc/bash.bashrc"
@@ -292,6 +277,22 @@ teardown_proot() {
     fi
 
     ui_info "${distro} 제거 완료."
+}
+
+setup_proot_alias() {
+    local distro="$PROOT_DISTRO"
+    local user="$PROOT_USER"
+    [ -z "$distro" ] && return 0
+
+    # PROOT_SHELL: config에서 읽어 인터랙티브 셸 결정 (bash|zsh, 기본 bash)
+    local _proot_alias="alias ${distro}='proot-distro login ${distro} --user ${user} --shared-tmp -- env -u LD_PRELOAD \${PROOT_SHELL:-bash} --login'"
+
+    local bashrc="$PREFIX/etc/bash.bashrc"
+    grep -q "alias ${distro}=" "$bashrc" 2>/dev/null || echo "$_proot_alias" >> "$bashrc"
+
+    if command -v zsh &>/dev/null && [ -f "$HOME/.zshrc" ]; then
+        grep -q "alias ${distro}=" "$HOME/.zshrc" 2>/dev/null || echo "$_proot_alias" >> "$HOME/.zshrc"
+    fi
 }
 
 # -----------------------------------------------------------------------------

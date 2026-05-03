@@ -238,15 +238,17 @@ _test_prun_only_alarm_fallback_to_default() {
 it "home/ 에 alarm만 있으면 기본값 'user'로 폴백한다" _test_prun_only_alarm_fallback_to_default
 
 # =============================================================================
-# install.sh — proot alias LD_PRELOAD 처리
+# setup_proot_alias — proot alias LD_PRELOAD 처리
+# (install.sh에서 domain/proot_env.sh로 이동됨)
 # =============================================================================
 
 describe "install.sh — proot alias env -u LD_PRELOAD"
 
 _test_install_proot_alias_has_env_u() {
-    # install.sh 소스에서 proot alias 라인을 직접 grep으로 확인
+    # domain/proot_env.sh의 setup_proot_alias 함수에서 alias 라인 확인
+    local proot_env="${DOMAIN_DIR}/proot_env.sh"
     local alias_line
-    alias_line=$(grep "_proot_alias=" "${INSTALL_SH}" | head -1)
+    alias_line=$(grep "_proot_alias=" "$proot_env" | head -1)
 
     # env -u LD_PRELOAD 포함 여부
     assert_output_contains "$alias_line" "env -u LD_PRELOAD"
@@ -257,8 +259,9 @@ _test_install_proot_alias_has_env_u() {
 it "install.sh proot alias에 env -u LD_PRELOAD \${PROOT_SHELL:-bash} --login이 포함된다" _test_install_proot_alias_has_env_u
 
 _test_install_proot_alias_format() {
+    local proot_env="${DOMAIN_DIR}/proot_env.sh"
     local alias_line
-    alias_line=$(grep "_proot_alias=" "${INSTALL_SH}" | head -1)
+    alias_line=$(grep "_proot_alias=" "$proot_env" | head -1)
 
     # -- 구분자 뒤에 env -u LD_PRELOAD ${PROOT_SHELL:-bash} --login 순서 확인
     if ! echo "$alias_line" | grep -qF -- '-- env -u LD_PRELOAD'; then

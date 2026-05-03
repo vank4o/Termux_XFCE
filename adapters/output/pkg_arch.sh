@@ -7,30 +7,20 @@
 # 환경변수: PROOT_DISTRO=archlinux, PROOT_USER=<username> 필요
 # =============================================================================
 
-# Termux native 패키지 관리 (Ubuntu 어댑터와 동일 — Termux는 항상 pkg)
-pkg_update() {
-    pkg update -y -o Dpkg::Options::="--force-confold"
+# Termux native 패키지 관리 (공통)
+ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$ADAPTER_DIR/pkg_common_termux.sh"
+
+# -----------------------------------------------------------------------------
+# proot-distro 라이프사이클
+# -----------------------------------------------------------------------------
+
+proot_install() {
+    proot-distro install "$1"
 }
 
-pkg_upgrade() {
-    pkg upgrade -y -o Dpkg::Options::="--force-confold"
-}
-
-pkg_install() {
-    pkg install -y -o Dpkg::Options::="--force-confold" "$@"
-}
-
-pkg_remove() {
-    pkg uninstall -y "$@"
-}
-
-pkg_is_installed() {
-    pkg list-installed 2>/dev/null | grep -q "^${1}/"
-}
-
-pkg_autoremove() {
-    apt autoremove -y
-    apt autoclean -y
+proot_remove() {
+    proot-distro remove "$1" 2>/dev/null || true
 }
 
 # -----------------------------------------------------------------------------
@@ -58,8 +48,16 @@ proot_pkg_install() {
     proot_exec sudo pacman -S --noconfirm --needed "$@"
 }
 
+proot_pkg_install_root() {
+    proot_exec_root pacman -S --noconfirm --needed "$@"
+}
+
 proot_pkg_update() {
     proot_exec sudo pacman -Syu --noconfirm
+}
+
+proot_pkg_update_root() {
+    proot_exec_root pacman -Syu --noconfirm
 }
 
 proot_pkg_remove() {
