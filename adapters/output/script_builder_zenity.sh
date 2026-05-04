@@ -52,7 +52,6 @@ if [ "${DBUS_COUNT:-0}" -gt 1 ]; then
             ;;
         "세션 전체 종료")
             killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
-            am force-stop com.termux.x11 2>/dev/null || true
             ;;
     esac
     exit 0
@@ -64,10 +63,6 @@ sleep 1
 
 # 잔류 X 소켓/락 파일 전체 삭제
 rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
-
-# Termux:X11 APK 강제 종료 후 재시작 — APK가 :0 점유 시 서버 소켓 충돌 방지
-am force-stop com.termux.x11 2>/dev/null || true
-sleep 1
 
 termux-wake-lock
 
@@ -85,8 +80,8 @@ for _DTRY in 0 1 2 3; do
     TX11_PID=""
 done
 
-# Termux:X11 APK 열기 (화면 표시)
-am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity
+# Termux:X11 APK 열기 — -S: 기존 APK를 force-stop 후 새로 시작하여 X 서버 재연결 보장
+am start -S --user 0 -n com.termux.x11/com.termux.x11.MainActivity
 
 # X 소켓이 생길 때까지 최대 10초 추가 대기 (위 루프에서 이미 감지된 경우 즉시 통과)
 DISPLAY_NUM=""
@@ -166,7 +161,6 @@ fi
 
 # 모든 관련 프로세스 종료 (startXFCE 정리 로직과 동일)
 killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
-am force-stop com.termux.x11 2>/dev/null || true
 termux-wake-unlock 2>/dev/null || true
 EOF
 }
