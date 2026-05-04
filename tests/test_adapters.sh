@@ -143,4 +143,142 @@ _test_proot_pkg_autoremove_error() {
 }
 it "proot_pkg_autoremove는 에러 메시지를 출력한다" _test_proot_pkg_autoremove_error
 
+# =============================================================================
+# script_builder_zenity.sh — 스크립트 빌더 직접 테스트
+# =============================================================================
+
+describe "script_builder_zenity.sh — script_build_start_xfce"
+
+_test_sb_start_xfce_creates_valid_bash() {
+    source "${ADAPTER_DIR}/script_builder_zenity.sh"
+    local sb; sb=$(make_sandbox)
+    local out="${sb}/startXFCE"
+    script_build_start_xfce "$out"
+    assert_file_exists "$out"
+    bash -n "$out"
+    cleanup_sandbox "$sb"
+}
+it "유효한 bash 스크립트를 생성한다" _test_sb_start_xfce_creates_valid_bash
+
+_test_sb_start_xfce_has_display_detection() {
+    source "${ADAPTER_DIR}/script_builder_zenity.sh"
+    local sb; sb=$(make_sandbox)
+    local out="${sb}/startXFCE"
+    script_build_start_xfce "$out"
+    assert_file_contains "$out" ".X11-unix"
+    assert_file_contains "$out" "DISPLAY_NUM"
+    cleanup_sandbox "$sb"
+}
+it "DISPLAY 자동 감지 로직이 있다" _test_sb_start_xfce_has_display_detection
+
+_test_sb_start_xfce_pulse_no_idle_exit() {
+    source "${ADAPTER_DIR}/script_builder_zenity.sh"
+    local sb; sb=$(make_sandbox)
+    local out="${sb}/startXFCE"
+    script_build_start_xfce "$out"
+    assert_file_contains "$out" "exit-idle-time=-1"
+    assert_file_not_contains "$out" "exit-idle-time=120"
+    cleanup_sandbox "$sb"
+}
+it "PulseAudio exit-idle-time=-1 (유휴 종료 비활성)" _test_sb_start_xfce_pulse_no_idle_exit
+
+_test_sb_start_xfce_has_gpu_branch() {
+    source "${ADAPTER_DIR}/script_builder_zenity.sh"
+    local sb; sb=$(make_sandbox)
+    local out="${sb}/startXFCE"
+    script_build_start_xfce "$out"
+    assert_file_contains "$out" "MESA_LOADER_DRIVER_OVERRIDE=zink"
+    assert_file_contains "$out" "LIBGL_ALWAYS_SOFTWARE"
+    cleanup_sandbox "$sb"
+}
+it "GPU 분기(Zink vs llvmpipe)가 포함된다" _test_sb_start_xfce_has_gpu_branch
+
+_test_sb_start_xfce_has_session_duplicate_check() {
+    source "${ADAPTER_DIR}/script_builder_zenity.sh"
+    local sb; sb=$(make_sandbox)
+    local out="${sb}/startXFCE"
+    script_build_start_xfce "$out"
+    assert_file_contains "$out" "xfce4-session"
+    assert_file_contains "$out" "termux-x11"
+    assert_file_contains "$out" "세션 중복 감지"
+    cleanup_sandbox "$sb"
+}
+it "X11 세션 중복 감지 로직이 있다" _test_sb_start_xfce_has_session_duplicate_check
+
+_test_sb_start_xfce_am_start_force() {
+    source "${ADAPTER_DIR}/script_builder_zenity.sh"
+    local sb; sb=$(make_sandbox)
+    local out="${sb}/startXFCE"
+    script_build_start_xfce "$out"
+    assert_file_contains "$out" "am start -S"
+    cleanup_sandbox "$sb"
+}
+it "am start -S로 APK 강제 재시작한다" _test_sb_start_xfce_am_start_force
+
+describe "script_builder_zenity.sh — script_build_kill_x11"
+
+_test_sb_kill_creates_valid_bash() {
+    source "${ADAPTER_DIR}/script_builder_zenity.sh"
+    local sb; sb=$(make_sandbox)
+    local out="${sb}/kill_termux_x11"
+    script_build_kill_x11 "$out"
+    assert_file_exists "$out"
+    bash -n "$out"
+    cleanup_sandbox "$sb"
+}
+it "유효한 bash 스크립트를 생성한다" _test_sb_kill_creates_valid_bash
+
+_test_sb_kill_checks_pkg_running() {
+    source "${ADAPTER_DIR}/script_builder_zenity.sh"
+    local sb; sb=$(make_sandbox)
+    local out="${sb}/kill_termux_x11"
+    script_build_kill_x11 "$out"
+    assert_file_contains "$out" "apt\|apt-get\|dpkg\|nala"
+    cleanup_sandbox "$sb"
+}
+it "패키지 설치 중 여부를 확인한다" _test_sb_kill_checks_pkg_running
+
+_test_sb_kill_has_wake_unlock() {
+    source "${ADAPTER_DIR}/script_builder_zenity.sh"
+    local sb; sb=$(make_sandbox)
+    local out="${sb}/kill_termux_x11"
+    script_build_kill_x11 "$out"
+    assert_file_contains "$out" "termux-wake-unlock"
+    cleanup_sandbox "$sb"
+}
+it "종료 시 termux-wake-unlock을 호출한다" _test_sb_kill_has_wake_unlock
+
+describe "script_builder_zenity.sh — script_build_cp2menu"
+
+_test_sb_cp2menu_creates_valid_bash() {
+    source "${ADAPTER_DIR}/script_builder_zenity.sh"
+    local sb; sb=$(make_sandbox)
+    local out="${sb}/cp2menu"
+    script_build_cp2menu "$out"
+    assert_file_exists "$out"
+    bash -n "$out"
+    cleanup_sandbox "$sb"
+}
+it "유효한 bash 스크립트를 생성한다" _test_sb_cp2menu_creates_valid_bash
+
+_test_sb_cp2menu_reads_config() {
+    source "${ADAPTER_DIR}/script_builder_zenity.sh"
+    local sb; sb=$(make_sandbox)
+    local out="${sb}/cp2menu"
+    script_build_cp2menu "$out"
+    assert_file_contains "$out" "termux-xfce/config"
+    cleanup_sandbox "$sb"
+}
+it "termux-xfce/config에서 distro를 읽는다" _test_sb_cp2menu_reads_config
+
+_test_sb_cp2menu_uses_prun_gui() {
+    source "${ADAPTER_DIR}/script_builder_zenity.sh"
+    local sb; sb=$(make_sandbox)
+    local out="${sb}/cp2menu"
+    script_build_cp2menu "$out"
+    assert_file_contains "$out" "prun-gui"
+    cleanup_sandbox "$sb"
+}
+it "prun-gui로 Exec 라인을 변환한다" _test_sb_cp2menu_uses_prun_gui
+
 print_results

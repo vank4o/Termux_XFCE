@@ -205,21 +205,23 @@ Source: [yanghoeg/App-Installer](https://github.com/yanghoeg/App-Installer) (Git
 ## Tests
 
 ```bash
-bash tests/run_tests.sh              # all 141 tests
+bash tests/run_tests.sh              # all 280 tests
 bash tests/run_tests.sh domain_termux
-bash tests/run_tests.sh app_installer
+bash tests/run_tests.sh domain_locale_ko
 ```
 
 | Suite | Count | Coverage |
 |-------|-------|----------|
 | ports | 7 | adapter contract compliance |
-| adapters | 12 | pkg_termux, ui_terminal |
-| domain_termux | 25 | termux_env logic |
-| domain_xfce | 18 | xfce_env logic |
-| domain_proot | 25 | proot_env logic |
-| app_installer | 39 | installer script validation |
-| prun_ld_preload | 15 | prun / LD_PRELOAD regression |
-| **Total** | **141** | **All pass on real device** |
+| adapters | 24 | pkg_termux, ui_terminal, script_builder_zenity |
+| domain_termux | 45 | termux_env logic |
+| domain_xfce | 34 | xfce_env + migration logic |
+| domain_proot | 58 | proot_env logic (Ubuntu/Arch) |
+| domain_locale_ko | 18 | locale_ko logic (Korean locale) |
+| app_installer | 50 | installer script validation |
+| prun_ld_preload | 17 | prun / LD_PRELOAD regression |
+| e2e_install | 27 | end-to-end composition & regression |
+| **Total** | **280** | **All pass on real device** |
 
 ## Android System Optimization
 
@@ -273,6 +275,7 @@ Termux_XFCE/
 ├── install.sh                    ← entry point + DI container
 ├── ports/
 │   ├── pkg_manager.sh            ← package manager contract
+│   ├── script_builder.sh         ← runtime script builder contract
 │   └── ui.sh                     ← UI contract
 ├── adapters/
 │   ├── input/
@@ -282,6 +285,8 @@ Termux_XFCE/
 │       ├── pkg_termux.sh         ← Termux pkg adapter
 │       ├── pkg_ubuntu.sh         ← Ubuntu apt adapter
 │       ├── pkg_arch.sh           ← Arch pacman adapter
+│       ├── pkg_common_termux.sh  ← shared Termux pkg helpers
+│       ├── script_builder_zenity.sh ← startXFCE / kill / cp2menu script generator
 │       ├── ui_terminal.sh        ← echo-based UI
 │       ├── ui_yad.sh             ← yad searchable GUI (zenity superset)
 │       └── ui_zenity.sh          ← zenity GUI UI (fallback)
@@ -291,9 +296,12 @@ Termux_XFCE/
 │   ├── xfce_env.sh               ← XFCE setup logic
 │   ├── proot_env.sh              ← proot logic (Ubuntu/Arch common)
 │   └── locale_ko.sh              ← Korean locale opt-in (LD_PRELOAD gettext hook)
+├── tar/
+│   ├── config/                   ← XFCE / autostart preset configs
+│   └── conky/                    ← Conky theme (Alterf)
 ├── assets/
 │   └── force_gettext.c           ← gettext hooking C source (→ force_gettext.so)
-├── tests/                        ← 141 automated tests
+├── tests/                        ← 280 automated tests (9 suites)
 └── app-installer/                ← extra app GUI (Git Submodule)
 ```
 

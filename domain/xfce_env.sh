@@ -90,6 +90,8 @@ setup_xfce_autostart() {
     _migrate_borderless_maximize
     _migrate_disable_compositing
     _migrate_remove_actions_plugin
+    _migrate_dbus_propagate_path
+    _migrate_conky_exec_ampersand
 }
 
 # -----------------------------------------------------------------------------
@@ -286,4 +288,24 @@ _migrate_remove_actions_plugin() {
     sed -i '/<value type="int" value="20"\/>/d' "$xml"
     # actions 플러그인 정의 블록 제거
     sed -i '/<property name="plugin-20".*value="actions">/,/<\/property>/d' "$xml"
+}
+
+# 기존 설치본의 dbus-propagate autostart에서 /usr/bin/env → bash 직접 호출로 전환
+# Why: Termux에는 /usr/bin/env가 없어 XFCE autostart 실행 시 절대경로 해석 실패
+#      → dbus activation 환경 전파가 완전히 무동작 상태
+_migrate_dbus_propagate_path() {
+    local desktop="$HOME/.config/autostart/00-env-dbus-propagate.desktop"
+    [ -f "$desktop" ] || return 0
+    grep -q '/usr/bin/env' "$desktop" 2>/dev/null || return 0
+    sed -i 's|Exec=/usr/bin/env bash|Exec=bash|' "$desktop"
+}
+
+# 기존 설치본의 conky autostart Exec 끝 '&' 제거
+# Why: desktop entry 스펙에서 Exec 값은 셸 해석 없이 직접 실행되므로
+#      '&'가 conky 인자로 전달되어 실행 실패 가능
+_migrate_conky_exec_ampersand() {
+    local desktop="$HOME/.config/autostart/conky.desktop"
+    [ -f "$desktop" ] || return 0
+    grep -q 'Exec=.*&$' "$desktop" 2>/dev/null || return 0
+    sed -i 's| &$||' "$desktop"
 }

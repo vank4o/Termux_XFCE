@@ -325,4 +325,309 @@ _test_autostart_idempotent() {
 }
 it "멱등성 — conky.desktop이 이미 있으면 재복사하지 않는다" _test_autostart_idempotent
 
+# =============================================================================
+# _migrate_dbus_propagate_path — /usr/bin/env → bash
+# =============================================================================
+
+describe "xfce_env — _migrate_dbus_propagate_path"
+
+_test_dbus_propagate_fixes_path() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${HOME}/.config/autostart"
+    cat > "${HOME}/.config/autostart/00-env-dbus-propagate.desktop" << 'EOF'
+[Desktop Entry]
+Exec=/usr/bin/env bash -lc 'dbus-update-activation-environment --all'
+EOF
+
+    _migrate_dbus_propagate_path
+
+    assert_file_contains "${HOME}/.config/autostart/00-env-dbus-propagate.desktop" "Exec=bash"
+    assert_file_not_contains "${HOME}/.config/autostart/00-env-dbus-propagate.desktop" "/usr/bin/env"
+    cleanup_sandbox "$sb"
+}
+it "/usr/bin/env를 bash 직접 호출로 변환한다" _test_dbus_propagate_fixes_path
+
+_test_dbus_propagate_idempotent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${HOME}/.config/autostart"
+    cat > "${HOME}/.config/autostart/00-env-dbus-propagate.desktop" << 'EOF'
+[Desktop Entry]
+Exec=bash -lc 'dbus-update-activation-environment --all'
+EOF
+
+    _migrate_dbus_propagate_path
+
+    assert_file_contains "${HOME}/.config/autostart/00-env-dbus-propagate.desktop" "Exec=bash"
+    cleanup_sandbox "$sb"
+}
+it "멱등성 — 이미 수정된 경우 건너뛴다" _test_dbus_propagate_idempotent
+
+# =============================================================================
+# _migrate_conky_exec_ampersand — Exec 끝 & 제거
+# =============================================================================
+
+describe "xfce_env — _migrate_conky_exec_ampersand"
+
+_test_conky_removes_ampersand() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${HOME}/.config/autostart"
+    cat > "${HOME}/.config/autostart/conky.desktop" << 'EOF'
+[Desktop Entry]
+Exec=prun conky -c .config/conky/Alterf/Alterf.conf &
+EOF
+
+    _migrate_conky_exec_ampersand
+
+    assert_file_contains "${HOME}/.config/autostart/conky.desktop" "Exec=prun conky"
+    assert_file_not_contains "${HOME}/.config/autostart/conky.desktop" " &"
+    cleanup_sandbox "$sb"
+}
+it "Exec 끝의 &를 제거한다" _test_conky_removes_ampersand
+
+_test_conky_ampersand_idempotent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${HOME}/.config/autostart"
+    cat > "${HOME}/.config/autostart/conky.desktop" << 'EOF'
+[Desktop Entry]
+Exec=prun conky -c .config/conky/Alterf/Alterf.conf
+EOF
+
+    _migrate_conky_exec_ampersand
+
+    assert_file_contains "${HOME}/.config/autostart/conky.desktop" "Exec=prun conky"
+    cleanup_sandbox "$sb"
+}
+it "멱등성 — &가 없으면 건너뛴다" _test_conky_ampersand_idempotent
+
+# =============================================================================
+# _migrate_fix_x11_input — fix-x11-input.desktop 항상 덮어쓰기
+# =============================================================================
+
+describe "xfce_env — _migrate_fix_x11_input"
+
+_test_fix_x11_input_copies() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    export SCRIPT_DIR="${_REAL_PROJECT_DIR}"
+    mkdir -p "${HOME}/.config/autostart"
+
+    _migrate_fix_x11_input
+
+    assert_file_exists "${HOME}/.config/autostart/fix-x11-input.desktop"
+    assert_file_contains "${HOME}/.config/autostart/fix-x11-input.desktop" "xdotool"
+    cleanup_sandbox "$sb"
+}
+it "fix-x11-input.desktop을 복사한다" _test_fix_x11_input_copies
+
+_test_fix_x11_input_overwrites() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    export SCRIPT_DIR="${_REAL_PROJECT_DIR}"
+    mkdir -p "${HOME}/.config/autostart"
+    echo "old content" > "${HOME}/.config/autostart/fix-x11-input.desktop"
+
+    _migrate_fix_x11_input
+
+    assert_file_contains "${HOME}/.config/autostart/fix-x11-input.desktop" "xdotool"
+    assert_file_not_contains "${HOME}/.config/autostart/fix-x11-input.desktop" "old content"
+    cleanup_sandbox "$sb"
+}
+it "기존 파일을 항상 최신 버전으로 덮어쓴다" _test_fix_x11_input_overwrites
+
+_test_fix_x11_input_no_source_skips() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    export SCRIPT_DIR="${sb}/nonexistent"
+
+    _migrate_fix_x11_input
+
+    [ ! -f "${HOME}/.config/autostart/fix-x11-input.desktop" ]
+    cleanup_sandbox "$sb"
+}
+it "소스 파일 없으면 건너뛴다" _test_fix_x11_input_no_source_skips
+
+# =============================================================================
+# _migrate_terminal_font — terminalrc + xfconf xml 폰트 패치
+# =============================================================================
+
+describe "xfce_env — _migrate_terminal_font"
+
+_test_terminal_font_patches_terminalrc() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${HOME}/.config/xfce4/terminal"
+    echo 'FontName=Cascadia Mono PL 12' > "${HOME}/.config/xfce4/terminal/terminalrc"
+
+    _migrate_terminal_font
+
+    assert_file_contains "${HOME}/.config/xfce4/terminal/terminalrc" "MesloLGS Nerd Font Mono 12"
+    cleanup_sandbox "$sb"
+}
+it "terminalrc의 구 폰트를 MesloLGS Nerd Font Mono로 패치한다" _test_terminal_font_patches_terminalrc
+
+_test_terminal_font_patches_xml() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml"
+    cat > "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml" << 'EOF'
+<channel name="xfce4-terminal">
+  <property name="font-name" type="string" value="MesloLGS NF 12"/>
+</channel>
+EOF
+
+    _migrate_terminal_font
+
+    assert_file_contains "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-terminal.xml" 'value="MesloLGS Nerd Font Mono 12"'
+    cleanup_sandbox "$sb"
+}
+it "xfconf xml의 구 폰트를 MesloLGS Nerd Font Mono로 패치한다" _test_terminal_font_patches_xml
+
+_test_terminal_font_idempotent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${HOME}/.config/xfce4/terminal"
+    echo 'FontName=MesloLGS Nerd Font Mono 12' > "${HOME}/.config/xfce4/terminal/terminalrc"
+
+    _migrate_terminal_font
+
+    assert_file_contains "${HOME}/.config/xfce4/terminal/terminalrc" "MesloLGS Nerd Font Mono 12"
+    cleanup_sandbox "$sb"
+}
+it "멱등성 — 이미 올바른 폰트면 변경하지 않는다" _test_terminal_font_idempotent
+
+# =============================================================================
+# _migrate_borderless_maximize — xfwm4 true→false
+# =============================================================================
+
+describe "xfce_env — _migrate_borderless_maximize"
+
+_test_borderless_maximize_patches() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml"
+    cat > "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml" << 'EOF'
+<channel name="xfwm4">
+  <property name="borderless_maximize" type="bool" value="true"/>
+</channel>
+EOF
+
+    _migrate_borderless_maximize
+
+    assert_file_contains "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml" 'value="false"'
+    cleanup_sandbox "$sb"
+}
+it "borderless_maximize를 true→false로 패치한다" _test_borderless_maximize_patches
+
+_test_borderless_maximize_idempotent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml"
+    cat > "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml" << 'EOF'
+<channel name="xfwm4">
+  <property name="borderless_maximize" type="bool" value="false"/>
+</channel>
+EOF
+
+    _migrate_borderless_maximize
+
+    local count
+    count=$(grep -c 'value="false"' "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml")
+    assert_eq "1" "$count"
+    cleanup_sandbox "$sb"
+}
+it "멱등성 — 이미 false면 변경하지 않는다" _test_borderless_maximize_idempotent
+
+# =============================================================================
+# _migrate_disable_compositing — xfwm4 컴포지터 off
+# =============================================================================
+
+describe "xfce_env — _migrate_disable_compositing"
+
+_test_disable_compositing_patches() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml"
+    cat > "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml" << 'EOF'
+<channel name="xfwm4">
+  <property name="use_compositing" type="bool" value="true"/>
+</channel>
+EOF
+
+    _migrate_disable_compositing
+
+    assert_file_contains "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml" 'use_compositing" type="bool" value="false"'
+    cleanup_sandbox "$sb"
+}
+it "use_compositing을 true→false로 패치한다" _test_disable_compositing_patches
+
+_test_disable_compositing_idempotent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml"
+    cat > "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml" << 'EOF'
+<channel name="xfwm4">
+  <property name="use_compositing" type="bool" value="false"/>
+</channel>
+EOF
+
+    _migrate_disable_compositing
+
+    assert_file_contains "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml" 'value="false"'
+    cleanup_sandbox "$sb"
+}
+it "멱등성 — 이미 false면 변경하지 않는다" _test_disable_compositing_idempotent
+
+# =============================================================================
+# _migrate_remove_actions_plugin — 패널 actions 플러그인 제거
+# =============================================================================
+
+describe "xfce_env — _migrate_remove_actions_plugin"
+
+_test_remove_actions_plugin() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml"
+    cat > "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml" << 'EOF'
+<channel name="xfce4-panel">
+  <property name="plugin-ids" type="array">
+    <value type="int" value="1"/>
+    <value type="int" value="20"/>
+  </property>
+  <property name="plugin-20" type="string" value="actions">
+    <property name="items" type="array"/>
+  </property>
+</channel>
+EOF
+
+    _migrate_remove_actions_plugin
+
+    assert_file_not_contains "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml" 'value="20"'
+    assert_file_not_contains "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml" 'value="actions"'
+    cleanup_sandbox "$sb"
+}
+it "패널에서 actions 플러그인(plugin-20)을 제거한다" _test_remove_actions_plugin
+
+_test_remove_actions_plugin_idempotent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml"
+    cat > "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml" << 'EOF'
+<channel name="xfce4-panel">
+  <property name="plugin-ids" type="array">
+    <value type="int" value="1"/>
+  </property>
+</channel>
+EOF
+
+    _migrate_remove_actions_plugin
+
+    assert_file_contains "${HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml" 'value="1"'
+    cleanup_sandbox "$sb"
+}
+it "멱등성 — actions가 없으면 변경하지 않는다" _test_remove_actions_plugin_idempotent
+
 print_results

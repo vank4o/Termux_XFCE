@@ -106,6 +106,14 @@ assert_file_contains() {
     fi
 }
 
+assert_file_not_contains() {
+    local path="$1" pattern="$2"
+    if grep -q "$pattern" "$path" 2>/dev/null; then
+        echo "[ASSERT] file '${path}' should not contain pattern '${pattern}'" >&2
+        return 1
+    fi
+}
+
 assert_cmd_exists() {
     local cmd="$1"
     if ! declare -f "$cmd" > /dev/null 2>&1; then
