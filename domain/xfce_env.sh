@@ -88,6 +88,7 @@ setup_xfce_autostart() {
     _migrate_flameshot_native
     _migrate_terminal_font
     _migrate_borderless_maximize
+    _migrate_disable_compositing
 }
 
 # -----------------------------------------------------------------------------
@@ -262,4 +263,14 @@ _migrate_borderless_maximize() {
     [ -f "$xml" ] || return 0
     grep -q 'name="borderless_maximize"[^/]*value="true"' "$xml" 2>/dev/null || return 0
     sed -i 's#name="borderless_maximize" type="bool" value="true"#name="borderless_maximize" type="bool" value="false"#' "$xml"
+}
+
+# 기존 설치본의 컴포지터 끄기 — Zink(GPU) + 컴포지터 조합이 검은 화면 유발
+# Why: Adreno GPU에서 MESA_LOADER_DRIVER_OVERRIDE=zink + use_compositing=true면
+#      Termux:X11 화면이 검은색으로만 표시되어 데스크탑을 사용할 수 없음
+_migrate_disable_compositing() {
+    local xml="$HOME/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml"
+    [ -f "$xml" ] || return 0
+    grep -q 'name="use_compositing"[^/]*value="true"' "$xml" 2>/dev/null || return 0
+    sed -i 's#name="use_compositing" type="bool" value="true"#name="use_compositing" type="bool" value="false"#' "$xml"
 }
