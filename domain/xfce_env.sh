@@ -89,6 +89,7 @@ setup_xfce_autostart() {
     _migrate_terminal_font
     _migrate_borderless_maximize
     _migrate_disable_compositing
+    _migrate_remove_actions_plugin
 }
 
 # -----------------------------------------------------------------------------
@@ -273,4 +274,16 @@ _migrate_disable_compositing() {
     [ -f "$xml" ] || return 0
     grep -q 'name="use_compositing"[^/]*value="true"' "$xml" 2>/dev/null || return 0
     sed -i 's#name="use_compositing" type="bool" value="true"#name="use_compositing" type="bool" value="false"#' "$xml"
+}
+
+# 패널에서 XFCE actions 플러그인 제거 — Termux에 systemd/logind 없어서
+# shutdown/reboot 비활성화, logout도 정상 종료 불가 → Kill Termux X11 버튼만 유지
+_migrate_remove_actions_plugin() {
+    local xml="$HOME/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
+    [ -f "$xml" ] || return 0
+    grep -q 'value="actions"' "$xml" 2>/dev/null || return 0
+    # plugin-ids에서 plugin-20 제거
+    sed -i '/<value type="int" value="20"\/>/d' "$xml"
+    # actions 플러그인 정의 블록 제거
+    sed -i '/<property name="plugin-20".*value="actions">/,/<\/property>/d' "$xml"
 }

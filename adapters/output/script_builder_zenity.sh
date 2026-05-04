@@ -155,18 +155,19 @@ if pgrep -f 'apt|apt-get|dpkg|nala' > /dev/null; then
     exit 1
 fi
 
-termux_x11_pid=$(pgrep -f /system/bin/app_process.*com.termux.x11.Loader)
-xfce_pid=$(pgrep -f "xfce4-session")
+# X 서버 종료 전에 세션 존재 여부 확인
+XFCE_PID=$(pgrep -x xfce4-session 2>/dev/null | head -1)
+TX11_PID=$(pgrep -f termux-x11 2>/dev/null | head -1)
 
-if [ -n "$termux_x11_pid" ] && [ -n "$xfce_pid" ]; then
-    kill -9 "$termux_x11_pid" "$xfce_pid"
-    zenity --info --text="Termux-X11 및 XFCE 세션이 종료되었습니다."
-else
+if [ -z "$XFCE_PID" ] && [ -z "$TX11_PID" ]; then
     zenity --info --text="실행 중인 세션을 찾을 수 없습니다."
+    exit 0
 fi
 
-pid=$(termux-info | grep -o 'TERMUX_APP_PID=[0-9]\+' | cut -d= -f2)
-[ -n "$pid" ] && kill "$pid"
+# 모든 관련 프로세스 종료 (startXFCE 정리 로직과 동일)
+killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+am force-stop com.termux.x11 2>/dev/null || true
+termux-wake-unlock 2>/dev/null || true
 EOF
 }
 
