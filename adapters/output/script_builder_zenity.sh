@@ -51,38 +51,52 @@ if [ "${DBUS_COUNT:-0}" -gt 1 ]; then
             am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity
             ;;
         "세션 전체 종료")
-            killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon 2>/dev/null || true
+            killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+            am force-stop com.termux.x11 2>/dev/null || true
             ;;
     esac
     exit 0
 fi
 # ───────────────���────────────────────────────────��───────────────
 
-killall -9 termux-x11 Xwayland xfce4-session pulseaudio 2>/dev/null || true
+killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
 sleep 1
 
 # 잔류 X 소켓/락 파일 전체 삭제
 rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
 
+# Termux:X11 APK 강제 종료 후 재시작 — APK가 :0 점유 시 서버 소켓 충돌 방지
+am force-stop com.termux.x11 2>/dev/null || true
+sleep 1
+
 termux-wake-lock
 
-# X 서버 실행 (소켓 생성) — :1은 nightly APK 내부 점유, :0 사용
-termux-x11 :0 &
-TX11_PID=$!
+# X 서버 실행 — 사용 가능한 디스플레이 번호 자동 탐색 (:0~:3)
+# APK 버전에 따라 :0 또는 :1을 내부 점유하므로 첫 성공 번호를 사용
+TX11_PID=""
+for _DTRY in 0 1 2 3; do
+    termux-x11 :${_DTRY} 2>/dev/null &
+    TX11_PID=$!
+    sleep 2
+    if [ -e "${TMPDIR}/.X11-unix/X${_DTRY}" ]; then
+        break
+    fi
+    kill $TX11_PID 2>/dev/null || true
+    TX11_PID=""
+done
 
 # Termux:X11 APK 열기 (화면 표시)
-sleep 2
 am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity
 
-# X 소켓이 생길 때까지 최대 20초 대기 후 DISPLAY 자동 감지
+# X 소켓이 생길 때까지 최대 10초 추가 대기 (위 루프에서 이미 감지된 경우 즉시 통과)
 DISPLAY_NUM=""
-for i in $(seq 1 20); do
-    sleep 1
+for i in $(seq 1 10); do
     SOCK=$(ls "${TMPDIR}/.X11-unix/X"* 2>/dev/null | head -1)
     if [ -n "$SOCK" ]; then
         DISPLAY_NUM=$(basename "$SOCK" | sed 's/^X//')
         break
     fi
+    sleep 1
 done
 
 if [ -z "$DISPLAY_NUM" ]; then

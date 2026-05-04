@@ -87,6 +87,7 @@ setup_xfce_autostart() {
     _migrate_fix_x11_input
     _migrate_flameshot_native
     _migrate_terminal_font
+    _migrate_borderless_maximize
 }
 
 # -----------------------------------------------------------------------------
@@ -251,4 +252,14 @@ _migrate_terminal_font() {
     if [ -f "$xml" ] && grep -qE "name=\"font-name\"[^/]*value=\"($old)" "$xml" 2>/dev/null; then
         sed -i -E "s#(name=\"font-name\"[^/]*value=)\"($old)[^\"]*\"#\\1\"${target}\"#" "$xml"
     fi
+}
+
+# 기존 설치본의 borderless_maximize 끄기 — 최대화 시 타이틀바(닫기 버튼) 숨김 방지
+# Why: borderless_maximize=true면 최대화된 창의 닫기/최소화 버튼이 사라져
+#      모바일 환경에서 창을 닫을 방법이 없어짐
+_migrate_borderless_maximize() {
+    local xml="$HOME/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml"
+    [ -f "$xml" ] || return 0
+    grep -q 'name="borderless_maximize"[^/]*value="true"' "$xml" 2>/dev/null || return 0
+    sed -i 's#name="borderless_maximize" type="bool" value="true"#name="borderless_maximize" type="bool" value="false"#' "$xml"
 }
