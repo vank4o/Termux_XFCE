@@ -190,7 +190,8 @@ CONFIG="$HOME/.config/termux-xfce/config"
 
 DISTRO="${PROOT_DISTRO:-ubuntu}"
 ROOTFS="$PREFIX/var/lib/proot-distro/installed-rootfs/$DISTRO"
-USERNAME=$(basename "$ROOTFS/home/"* 2>/dev/null || echo "user")
+USERNAME=$(ls "$ROOTFS/home/" 2>/dev/null | head -1)
+USERNAME="${USERNAME:-user}"
 
 action=$(zenity --list --title="cp2menu" --text="작업 선택:" \
     --radiolist --column="" --column="Action" \
@@ -210,6 +211,7 @@ if [[ "$action" == "Copy .desktop file" ]]; then
     app_name="${app_name:-App}"
     # sed 구분자(|)와 작은따옴표 충돌 방지
     app_name="${app_name//\'/\'\\\'\'}"
+    app_name="${app_name//&/\\&}"
     app_name="${app_name//|/\\|}"
     sed -i "s|^Exec=\(.*\)$|Exec=bash -c \"prun-gui '${app_name}' -- \1 </dev/null >/dev/null 2>\&1 \&\"|" \
         "$PREFIX/share/applications/$filename"

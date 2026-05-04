@@ -19,7 +19,7 @@ setup_xfce_packages() {
     # pkg install 중에 ~/Desktop에 .desktop 파일을 복사하려 시도하기 때문
     mkdir -p "$HOME/Desktop"
 
-    local -a _pkgs=("${PKGS_TERMUX_XFCE[@]}" "${PKGS_TERMUX_CLI[@]}")
+    local -a _pkgs=("${PKGS_TERMUX_XFCE[@]}")
     local total=${#_pkgs[@]} i=0
     for p in "${_pkgs[@]}"; do
         ((i++))

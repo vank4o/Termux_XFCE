@@ -160,12 +160,18 @@ _append_to_rc() {
 
 _setup_termux_properties() {
     local props="$HOME/.termux/termux.properties"
-    # 멱등성: 이미 설정된 경우 건너뜀
-    grep -q "^allow-external-apps = true" "$props" 2>/dev/null || \
+    if ! grep -q "^allow-external-apps = true" "$props" 2>/dev/null; then
         sed -i 's/# allow-external-apps = true/allow-external-apps = true/g' "$props"
+        # sed 대상 주석이 없었을 경우 직접 추가
+        grep -q "^allow-external-apps = true" "$props" 2>/dev/null || \
+            echo "allow-external-apps = true" >> "$props"
+    fi
 
-    grep -q "^bell-character = ignore" "$props" 2>/dev/null || \
+    if ! grep -q "^bell-character = ignore" "$props" 2>/dev/null; then
         sed -i 's/# bell-character = ignore/bell-character = ignore/g' "$props"
+        grep -q "^bell-character = ignore" "$props" 2>/dev/null || \
+            echo "bell-character = ignore" >> "$props"
+    fi
 }
 
 _setup_termux_repos() {
@@ -598,6 +604,7 @@ _migrate_desktop_to_prun_gui() {
         app_name="${app_name:-App}"
         # sed 구분자(|)와 작은따옴표 충돌 방지
         app_name="${app_name//\'/\'\\\'\'}"
+        app_name="${app_name//&/\\&}"
         app_name="${app_name//|/\\|}"
         sed -i "s|\"prun |\"prun-gui '${app_name}' -- |g" "$f"
     done

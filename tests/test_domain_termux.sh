@@ -54,6 +54,20 @@ _test_props_idempotent() {
 }
 it "멱등성 — 이미 설정된 경우 중복 추가하지 않는다" _test_props_idempotent
 
+_test_props_appends_when_no_comment() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    # 주석 라인 없이 빈 properties 파일
+    echo "# 임의 설정" > "${HOME}/.termux/termux.properties"
+
+    _setup_termux_properties
+    assert_file_contains "${HOME}/.termux/termux.properties" "^allow-external-apps = true"
+    assert_file_contains "${HOME}/.termux/termux.properties" "^bell-character = ignore"
+    cleanup_sandbox "$sb"
+}
+it "주석 라인 없으면 직접 추가한다 (폴백)" _test_props_appends_when_no_comment
+
 # =============================================================================
 # _setup_aliases
 # =============================================================================

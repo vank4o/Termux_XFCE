@@ -23,7 +23,7 @@ pkg_remove() {
 }
 
 pkg_is_installed() {
-    pkg list-installed 2>/dev/null | grep -q "^${1}/"
+    dpkg -s "$1" 2>/dev/null | grep -q "^Status: install ok installed"
 }
 
 pkg_autoremove() {
