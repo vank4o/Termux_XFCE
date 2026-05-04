@@ -21,40 +21,55 @@ mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null
 chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null
 export XDG_RUNTIME_DIR
 
-# ─── dbus 중복 감지: 1 초과이면 현황 다이얼로그 표시 ──────────
-# pgrep -c는 match 없을 때 "0\n" 출력 + exit 1 → "|| echo 0" 체이닝 시 "0\n0" 되어
-# [ -gt ] 가 "integer expected"로 실패 → exit 1 대신 매칭 리스트로 세고 공백 제거
-DBUS_COUNT=$(pgrep dbus-daemon 2>/dev/null | wc -l | tr -d ' ')
-if [ "${DBUS_COUNT:-0}" -gt 1 ]; then
-    # 기존 X 소켓으로 DISPLAY 자동 감지
-    _SOCK=$(ls "${TMPDIR}/.X11-unix/X"* 2>/dev/null | head -1)
-    if [ -n "$_SOCK" ]; then
-        _NUM=$(basename "$_SOCK" | sed 's/^X//')
+# ─── X11 세션 중복 감지: X 소켓 또는 세션 프로세스가 남아 있으면 다이얼로그 ───
+# 기존 dbus-daemon 카운트 방식은 세션 1개일 때 count=1이라 > 1 조건 미충족 → 감지 실패
+# 더 직접적인 지표(X 소켓, xfce4-session, termux-x11)로 판별
+_EXISTING_SOCK=$(ls "${TMPDIR}/.X11-unix/X"* 2>/dev/null | head -1)
+_EXISTING_XFCE=$(pgrep -x xfce4-session 2>/dev/null | head -1 || echo "")
+_EXISTING_TX11=$(pgrep -f "termux-x11 :" 2>/dev/null | head -1 || echo "")
+
+if [ -n "$_EXISTING_SOCK" ] || [ -n "$_EXISTING_XFCE" ] || [ -n "$_EXISTING_TX11" ]; then
+    # 기존 X 소켓으로 DISPLAY 설정 (zenity 표시용)
+    if [ -n "$_EXISTING_SOCK" ]; then
+        _NUM=$(basename "$_EXISTING_SOCK" | sed 's/^X//')
         export DISPLAY=":${_NUM}"
     fi
 
-    XFCE_PID=$(pgrep -x xfce4-session 2>/dev/null | head -1 || echo "")
-    TX11_PID=$(pgrep -f termux-x11 2>/dev/null | head -1 || echo "")
-    XFCE_STATUS=$([ -n "$XFCE_PID" ] && echo "실행 중 (PID: ${XFCE_PID})" || echo "미실행")
-    TX11_STATUS=$([ -n "$TX11_PID" ] && echo "실행 중 (PID: ${TX11_PID})" || echo "미실행")
+    XFCE_STATUS=$([ -n "$_EXISTING_XFCE" ] && echo "실행 중 (PID: ${_EXISTING_XFCE})" || echo "미실행")
+    TX11_STATUS=$([ -n "$_EXISTING_TX11" ] && echo "실행 중 (PID: ${_EXISTING_TX11})" || echo "미실행")
+    DBUS_COUNT=$(pgrep dbus-daemon 2>/dev/null | wc -l | tr -d ' ')
 
     choice=$(zenity --list \
         --title="XFCE 세션 중복 감지" \
-        --text="⚠ dbus 인스턴스 ${DBUS_COUNT}개 감지됨\n\n현황\n  • XFCE4 세션 : ${XFCE_STATUS}\n  • Termux:X11 : ${TX11_STATUS}\n  • dbus 수     : ${DBUS_COUNT}개" \
-        --column="동작" --height=280 \
+        --text="⚠ X11 세션이 이미 실행 중입니다\n\n현황\n  • XFCE4 세션 : ${XFCE_STATUS}\n  • Termux:X11 : ${TX11_STATUS}\n  • dbus 수     : ${DBUS_COUNT:-0}개" \
+        --column="동작" --height=320 \
         "기존 세션으로 이동" \
+        "세션 종료 후 재시작" \
         "세션 전체 종료" \
         2>/dev/null || true)
 
     case "$choice" in
         "기존 세션으로 이동")
             am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity
+            exit 0
+            ;;
+        "세션 종료 후 재시작")
+            # 정리 후 아래 신규 세션 시작 로직으로 fall-through
+            killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+            sleep 1
+            rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
             ;;
         "세션 전체 종료")
             killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+            rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
+            termux-wake-unlock 2>/dev/null || true
+            exit 0
+            ;;
+        *)
+            # 취소(ESC/닫기) — 아무것도 안 함
+            exit 0
             ;;
     esac
-    exit 0
 fi
 # ───────────────���────────────────────────────────��───────────────
 
