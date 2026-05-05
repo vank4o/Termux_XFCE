@@ -105,23 +105,25 @@ it "ui_zenity.sh가 모든 ui 계약을 구현한다" _test_ui_zenity_contracts
 describe "포트 계약 — _pkg_manager_check"
 
 _test_pkg_check_fails_without_adapter() {
+    local rc=0
     (
         unset -f pkg_install 2>/dev/null || true
         source "${SCRIPT_DIR}/../ports/pkg_manager.sh"
         _pkg_manager_check
-    )
+    ) 2>/dev/null || rc=$?
     # 위 서브셸은 exit 1로 종료해야 함
-    assert_nonzero $? "_pkg_manager_check는 어댑터 없으면 1을 반환해야 한다"
+    assert_nonzero "$rc" "_pkg_manager_check는 어댑터 없으면 1을 반환해야 한다"
 }
 it "어댑터 없으면 _pkg_manager_check가 실패한다" _test_pkg_check_fails_without_adapter
 
 _test_pkg_check_passes_with_adapter() {
+    local rc=0
     (
         pkg_install() { :; }
         source "${SCRIPT_DIR}/../ports/pkg_manager.sh"
         _pkg_manager_check
-    )
-    assert_zero $? "_pkg_manager_check는 어댑터 있으면 0을 반환해야 한다"
+    ) || rc=$?
+    assert_zero "$rc" "_pkg_manager_check는 어댑터 있으면 0을 반환해야 한다"
 }
 it "어댑터 있으면 _pkg_manager_check가 성공한다" _test_pkg_check_passes_with_adapter
 

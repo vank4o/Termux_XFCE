@@ -32,7 +32,7 @@ setup_termux_gpu() {
     ui_info "GPU 가속(mesa, Adreno) 설치"
     local total=${#PKGS_TERMUX_GPU[@]} i=0
     for p in "${PKGS_TERMUX_GPU[@]}"; do
-        ((i++))
+        ((++i))
         if pkg_is_installed "$p"; then
             ui_info "  (${i}/${total}) ${p} — 이미 설치됨"
         else

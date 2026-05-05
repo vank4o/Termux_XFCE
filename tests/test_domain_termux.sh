@@ -17,6 +17,8 @@ _load_domain() {
     mock_ui_adapter
     mock_wget
     source "${DOMAIN_DIR}/packages.sh"
+    # script_builder는 순수 파일 생성기(외부 의존 없음) → 실제 어댑터 로드
+    source "${DOMAIN_DIR}/../adapters/output/script_builder_zenity.sh"
     source "${DOMAIN_DIR}/termux_env.sh"
 }
 
@@ -156,7 +158,7 @@ _test_startxfce_has_gpu_detection() {
 
     _setup_start_xfce
     assert_file_contains "${HOME}/.shortcuts/startXFCE" "GPU_MODEL"
-    assert_file_contains "${HOME}/.shortcuts/startXFCE" "MESA_DRIVER"
+    assert_file_contains "${HOME}/.shortcuts/startXFCE" "MESA_LOADER_DRIVER_OVERRIDE"
     assert_file_contains "${HOME}/.shortcuts/startXFCE" "kgsl"
     cleanup_sandbox "$sb"
 }

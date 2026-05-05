@@ -54,8 +54,12 @@ mock_pkg_adapter() {
         echo "$MOCK_INSTALLED_PKGS" | grep -qw "$pkg"
     }
     proot_exec()          { _record_call "proot_exec $*"; shift; bash -c "$*" 2>/dev/null || true; }
+    proot_exec_root()     { _record_call "proot_exec $*"; shift; bash -c "$*" 2>/dev/null || true; }
+    proot_install()       { _record_call "proot-distro install $*"; }
     proot_pkg_install()   { _record_call "proot_pkg_install $*"; }
+    proot_pkg_install_root() { _record_call "proot_pkg_install_root $*"; }
     proot_pkg_update()    { _record_call "proot_pkg_update"; }
+    proot_pkg_update_root() { _record_call "proot_pkg_update"; }
     proot_pkg_is_installed() { return 1; }  # 기본: 미설치
 }
 
@@ -131,6 +135,7 @@ setup_fs_sandbox() {
         "${HOME}/Desktop" \
         "${PREFIX}/etc/apt/sources.list.d" \
         "${PREFIX}/bin" \
+        "${PREFIX}/lib" \
         "${PREFIX}/share/applications" \
         "${PREFIX}/share/themes" \
         "${PREFIX}/share/icons" \
@@ -152,4 +157,9 @@ EOF
 
     # bash.bashrc stub
     touch "${PREFIX}/etc/bash.bashrc"
+
+    # tur.list stub — production에선 tur-repo 설치 시 생성됨 (mock_pkg_adapter는 미생성)
+    cat > "${PREFIX}/etc/apt/sources.list.d/tur.list" << 'EOF'
+deb https://termux.dev/tur stable main
+EOF
 }

@@ -27,12 +27,15 @@ it() {
     local test_fn="$2"
 
     # 서브셸에서 실행 → set -euo pipefail 에러도 잡힘
+    # NOTE: `if (...)` 형태로 감싸면 bash가 subshell 내부 set -e를 무시함
+    # (POSIX: "if 조건의 명령은 set -e 면제"). 별도로 $?를 캡처해야 함.
     local _tmpfile="${TMPDIR:-/data/data/com.termux/files/usr/tmp}/test_stderr_$$"
-    if (set -euo pipefail; "$test_fn") 2>"$_tmpfile"; then
+    (set -euo pipefail; "$test_fn") 2>"$_tmpfile"
+    local _rc=$?
+    if [ "$_rc" -eq 0 ]; then
         echo -e "  ${_GREEN}✓${_NC} ${name}"
         (( _PASS++ )) || true
     else
-        local exit_code=$?
         echo -e "  ${_RED}✗${_NC} ${name}"
         if [ -s "$_tmpfile" ]; then
             sed 's/^/    /' "$_tmpfile"
@@ -100,7 +103,8 @@ assert_dir_exists() {
 
 assert_file_contains() {
     local path="$1" pattern="$2"
-    if ! grep -q "$pattern" "$path" 2>/dev/null; then
+    # `--`로 옵션 종료: 패턴이 -로 시작해도 옵션으로 해석되지 않게 함
+    if ! grep -q -- "$pattern" "$path" 2>/dev/null; then
         echo "[ASSERT] file '${path}' does not contain pattern '${pattern}'" >&2
         return 1
     fi
@@ -108,7 +112,7 @@ assert_file_contains() {
 
 assert_file_not_contains() {
     local path="$1" pattern="$2"
-    if grep -q "$pattern" "$path" 2>/dev/null; then
+    if grep -q -- "$pattern" "$path" 2>/dev/null; then
         echo "[ASSERT] file '${path}' should not contain pattern '${pattern}'" >&2
         return 1
     fi

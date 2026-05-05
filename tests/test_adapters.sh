@@ -54,8 +54,9 @@ it "proot_pkg_install는 에러 메시지를 출력한다" _test_proot_pkg_insta
 
 _test_proot_pkg_is_installed_false() {
     source "${ADAPTER_DIR}/pkg_termux.sh"
-    proot_pkg_is_installed "nonexistent_pkg_xyz"
-    assert_nonzero $? "proot_pkg_is_installed는 항상 1(미설치)을 반환해야 한다"
+    local rc=0
+    proot_pkg_is_installed "nonexistent_pkg_xyz" || rc=$?
+    assert_nonzero "$rc" "proot_pkg_is_installed는 항상 1(미설치)을 반환해야 한다"
 }
 it "proot_pkg_is_installed는 항상 미설치(1)를 반환한다" _test_proot_pkg_is_installed_false
 

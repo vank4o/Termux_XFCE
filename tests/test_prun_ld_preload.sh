@@ -22,6 +22,7 @@ _load_domain() {
     mock_ui_adapter
     mock_wget
     source "${DOMAIN_DIR}/packages.sh"
+    source "${DOMAIN_DIR}/../adapters/output/script_builder_zenity.sh"
     source "${DOMAIN_DIR}/termux_env.sh"
 }
 

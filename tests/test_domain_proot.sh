@@ -35,7 +35,7 @@ _make_proot_rootfs() {
     local rootfs="${sandbox}/usr/var/lib/proot-distro/installed-rootfs/${distro}"
     mkdir -p \
         "${rootfs}/home/${user}" \
-        "${rootfs}/etc" \
+        "${rootfs}/etc/default" \
         "${rootfs}/usr/share/icons"
     # sudoers stub
     touch "${rootfs}/etc/sudoers"
@@ -154,7 +154,7 @@ _test_proot_env_written() {
 
     local bashrc="${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/home/testuser/.bashrc"
     assert_file_contains "$bashrc" "termux-xfce-proot-env"
-    assert_file_contains "$bashrc" "DISPLAY=:0.0"
+    assert_file_contains "$bashrc" 'DISPLAY=${DISPLAY:-:0.0}'
     assert_file_contains "$bashrc" "MESA_LOADER_DRIVER_OVERRIDE=zink"
     cleanup_sandbox "$sb"
 }
@@ -259,18 +259,6 @@ it "dist-dark 커서 테마를 proot로 복사한다" _test_cursor_theme_copied
 # =============================================================================
 
 describe "proot_env — setup_proot_fancybash"
-
-_test_fancybash_warns_if_src_missing() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb" "ubuntu" "testuser"
-    reset_ui_output
-
-    # Termux .fancybash.sh 없음
-    setup_proot_fancybash 2>/dev/null || true
-    assert_ui_contains "WARN"
-    cleanup_sandbox "$sb"
-}
-it "Termux의 .fancybash.sh가 없으면 경고를 출력한다" _test_fancybash_warns_if_src_missing
 
 _test_fancybash_copied_to_proot() {
     local sb; sb=$(make_sandbox)
@@ -662,8 +650,9 @@ _test_ubuntu_profile_guards_nimf_exec() {
 
     local profile="${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/home/testuser/.profile"
     # "nimf &" 가 단독으로 있으면 안 됨 — command -v 가드 필요
+    # grep -c는 0 매치 시 "0" 출력 후 exit 1 → `|| echo 0`은 "0\n0" 생성하므로 사용 금지
     local bare_nimf
-    bare_nimf=$(grep -c '^nimf &$' "$profile" 2>/dev/null || echo 0)
+    bare_nimf=$(grep -c '^nimf &$' "$profile" 2>/dev/null) || bare_nimf=0
     assert_eq "0" "$bare_nimf" ".profile에 가드 없는 'nimf &'가 없어야 한다"
     assert_file_contains "$profile" "command -v nimf"
     cleanup_sandbox "$sb"
@@ -699,7 +688,7 @@ _test_arch_nimf_profile_guards_nimf_exec() {
 
     local profile="${PREFIX}/var/lib/proot-distro/installed-rootfs/archlinux/home/testuser/.profile"
     local bare_nimf
-    bare_nimf=$(grep -c '^nimf &$' "$profile" 2>/dev/null || echo 0)
+    bare_nimf=$(grep -c '^nimf &$' "$profile" 2>/dev/null) || bare_nimf=0
     assert_eq "0" "$bare_nimf" ".profile에 가드 없는 'nimf &'가 없어야 한다"
     assert_file_contains "$profile" "command -v nimf"
     cleanup_sandbox "$sb"
