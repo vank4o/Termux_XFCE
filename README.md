@@ -28,13 +28,16 @@ Derived from [phoenixbyrd/Termux_XFCE](https://github.com/phoenixbyrd/Termux_XFC
 
 ## Installation
 
+> **Just run `install.sh` — every option below is asked interactively.**
+> The flags & env vars are only for non-interactive / scripted installs. If you don't pass them, the installer prompts for distro, username, GPU, Korean input, etc. on the terminal.
+
 ```bash
-# one-liner (auto clones repo then runs)
+# one-liner (auto clones repo then runs — interactive)
 curl -sL https://raw.githubusercontent.com/yanghoeg/Termux_XFCE/main/install.sh | bash
 ```
 
 ```bash
-# with options
+# non-interactive: with options
 bash install.sh --distro ubuntu --user <username> --gpu
 bash install.sh --distro archlinux --user <username>
 bash install.sh --no-proot          # Termux native only
@@ -43,7 +46,7 @@ bash install.sh --distro archlinux --user <username> --proot-only  # add 2nd dis
 ```
 
 ```bash
-# via environment variables
+# non-interactive: via environment variables
 DISTRO=ubuntu USERNAME=<username> INSTALL_GPU=true bash install.sh
 ```
 
