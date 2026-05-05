@@ -793,4 +793,70 @@ _test_shortcuts_creates_all() {
 }
 it "모든 유틸리티 스크립트를 생성한다" _test_shortcuts_creates_all
 
+# =============================================================================
+# 회귀: set -e + ((i++)) 폭탄 (i=0 시작 카운터)
+# i++는 *증가 전* 값을 종료코드로 반환하므로 i=0이면 exit 1 → set -e가 첫
+# 반복에서 스크립트를 즉시 죽인다. 기존 테스트들은 모두 `|| true`로 가려져
+# 있어 이 버그를 잡지 못했음. 새 테스트는 `|| true` 없이 호출하여 함수가
+# 끝까지 실행되는지를 직접 검증한다.
+# =============================================================================
+
+describe "termux_env — set -e safe counter (regression)"
+
+_test_install_base_packages_completes_under_set_e() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS=""
+
+    # || true 없이 직접 호출 — set -e 하에서 첫 반복부터 끝까지 가야 함
+    _install_base_packages
+
+    # 모든 패키지에 대해 pkg_install이 호출되었는지 (루프가 끝까지 돌았다는 증거)
+    local total=$((${#PKGS_TERMUX_BASE[@]} + ${#PKGS_TERMUX_CLI[@]} + ${#PKGS_TERMUX_PROOT[@]}))
+    local install_count=0
+    for call in "${MOCK_CALLS[@]:-}"; do
+        [[ "$call" == pkg_install* ]] && install_count=$((install_count + 1))
+    done
+    # dbus 재설치(remove → install) 1건 포함해 최소 total건은 호출되어야 함
+    [ "$install_count" -ge "$total" ]
+    cleanup_sandbox "$sb"
+}
+it "_install_base_packages가 set -e 하에서 끝까지 실행된다" _test_install_base_packages_completes_under_set_e
+
+_test_setup_termux_gpu_completes_under_set_e() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS=""
+
+    setup_termux_gpu
+
+    local install_count=0
+    for call in "${MOCK_CALLS[@]:-}"; do
+        [[ "$call" == pkg_install* ]] && install_count=$((install_count + 1))
+    done
+    [ "$install_count" -eq "${#PKGS_TERMUX_GPU[@]}" ]
+    cleanup_sandbox "$sb"
+}
+it "setup_termux_gpu가 set -e 하에서 끝까지 실행된다" _test_setup_termux_gpu_completes_under_set_e
+
+_test_setup_termux_korean_completes_under_set_e() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS=""
+
+    setup_termux_korean
+
+    local install_count=0
+    for call in "${MOCK_CALLS[@]:-}"; do
+        [[ "$call" == pkg_install* ]] && install_count=$((install_count + 1))
+    done
+    # tur-repo + 한글 패키지들
+    [ "$install_count" -ge "${#PKGS_TERMUX_KOREAN[@]}" ]
+    cleanup_sandbox "$sb"
+}
+it "setup_termux_korean이 set -e 하에서 끝까지 실행된다" _test_setup_termux_korean_completes_under_set_e
+
 print_results

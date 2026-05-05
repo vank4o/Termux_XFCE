@@ -47,7 +47,7 @@ setup_termux_gpu_dev() {
     ui_info "GPU 개발 도구(clvk 등) 설치"
     local total=${#PKGS_TERMUX_GPU_DEV[@]} i=0
     for p in "${PKGS_TERMUX_GPU_DEV[@]}"; do
-        ((i++))
+        ((++i))
         if pkg_is_installed "$p"; then
             ui_info "  (${i}/${total}) ${p} — 이미 설치됨"
         else
@@ -64,7 +64,7 @@ setup_termux_korean() {
 
     local total=${#PKGS_TERMUX_KOREAN[@]} i=0
     for p in "${PKGS_TERMUX_KOREAN[@]}"; do
-        ((i++))
+        ((++i))
         if pkg_is_installed "$p"; then
             ui_info "  (${i}/${total}) ${p} — 이미 설치됨"
         else
@@ -204,7 +204,7 @@ _install_base_packages() {
 
     local total=${#all_pkgs[@]} i=0
     for p in "${all_pkgs[@]}"; do
-        ((i++))
+        ((++i))
         if pkg_is_installed "$p"; then
             ui_info "  (${i}/${total}) ${p} — 이미 설치됨"
         else

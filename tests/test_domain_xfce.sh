@@ -630,4 +630,28 @@ EOF
 }
 it "멱등성 — actions가 없으면 변경하지 않는다" _test_remove_actions_plugin_idempotent
 
+# =============================================================================
+# 회귀: set -e + ((i++)) 폭탄 — || true 없이 끝까지 실행 검증
+# =============================================================================
+
+describe "xfce_env — set -e safe counter (regression)"
+
+_test_setup_xfce_packages_completes_under_set_e() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS=""
+
+    # || true 없이 호출 — i=0에서 시작하는 카운터 루프가 set -e로 죽지 않음을 보증
+    setup_xfce_packages
+
+    local install_count=0
+    for call in "${MOCK_CALLS[@]:-}"; do
+        [[ "$call" == pkg_install* ]] && install_count=$((install_count + 1))
+    done
+    [ "$install_count" -eq "${#PKGS_TERMUX_XFCE[@]}" ]
+    cleanup_sandbox "$sb"
+}
+it "setup_xfce_packages가 set -e 하에서 끝까지 실행된다" _test_setup_xfce_packages_completes_under_set_e
+
 print_results
