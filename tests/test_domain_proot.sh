@@ -739,4 +739,290 @@ _test_arch_fcitx5_profile_uses_disown() {
 }
 it "Arch fcitx5 폴백 시 .profile fcitx5 백그라운드 실행에 disown을 포함한다" _test_arch_fcitx5_profile_uses_disown
 
+# =============================================================================
+# setup_proot_timezone — getprop + proot_exec_root
+# =============================================================================
+
+describe "proot_env — setup_proot_timezone"
+
+_test_timezone_calls_exec_root() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    reset_mock_calls
+    getprop() { echo "Asia/Seoul"; }
+    proot_exec_root() { _record_call "proot_exec_root $*"; }
+
+    setup_proot_timezone 2>/dev/null || true
+    assert_was_called "proot_exec_root ln -sf"
+    cleanup_sandbox "$sb"
+}
+it "proot_exec_root로 /etc/localtime 심볼릭 링크를 생성한다" _test_timezone_calls_exec_root
+
+_test_timezone_uses_getprop_value() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    reset_mock_calls
+    getprop() { echo "America/New_York"; }
+    local _tz_arg=""
+    proot_exec_root() {
+        _record_call "proot_exec_root $*"
+        [[ "$*" == *"America/New_York"* ]] && _tz_arg="ok"
+    }
+
+    setup_proot_timezone 2>/dev/null || true
+    assert_was_called "America/New_York"
+    cleanup_sandbox "$sb"
+}
+it "getprop 결과를 시간대로 사용한다" _test_timezone_uses_getprop_value
+
+# =============================================================================
+# setup_proot_hardware_accel — distro 분기 GPU 유틸 설치
+# =============================================================================
+
+describe "proot_env — setup_proot_hardware_accel"
+
+_test_hw_accel_ubuntu_pkgs() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    reset_mock_calls
+
+    setup_proot_hardware_accel 2>/dev/null || true
+    assert_was_called "proot_pkg_install mesa-utils vulkan-tools"
+    cleanup_sandbox "$sb"
+}
+it "Ubuntu: mesa-utils, vulkan-tools를 설치한다" _test_hw_accel_ubuntu_pkgs
+
+_test_hw_accel_arch_pkgs() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "archlinux" "testuser"
+    reset_mock_calls
+
+    setup_proot_hardware_accel 2>/dev/null || true
+    assert_was_called "proot_pkg_install mesa vulkan-tools mesa-demos"
+    cleanup_sandbox "$sb"
+}
+it "Arch: mesa, vulkan-tools, mesa-demos를 설치한다" _test_hw_accel_arch_pkgs
+
+# =============================================================================
+# teardown_proot — 제거 흐름
+# =============================================================================
+
+describe "proot_env — teardown_proot"
+
+_test_teardown_calls_proot_remove() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    reset_mock_calls
+    proot_remove() { _record_call "proot_remove $*"; }
+
+    # alias를 bashrc에 미리 추가
+    echo "alias ubuntu='proot-distro login ubuntu'" >> "${PREFIX}/etc/bash.bashrc"
+
+    teardown_proot 2>/dev/null || true
+    assert_was_called "proot_remove ubuntu"
+    cleanup_sandbox "$sb"
+}
+it "proot_remove를 호출하여 rootfs를 제거한다" _test_teardown_calls_proot_remove
+
+_test_teardown_removes_alias_from_bashrc() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    proot_remove() { _record_call "proot_remove $*"; }
+
+    echo "alias ubuntu='proot-distro login ubuntu'" >> "${PREFIX}/etc/bash.bashrc"
+
+    teardown_proot 2>/dev/null || true
+    assert_file_not_contains "${PREFIX}/etc/bash.bashrc" "alias ubuntu="
+    cleanup_sandbox "$sb"
+}
+it "bash.bashrc에서 distro alias를 제거한다" _test_teardown_removes_alias_from_bashrc
+
+_test_teardown_removes_alias_from_zshrc() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    proot_remove() { _record_call "proot_remove $*"; }
+
+    touch "${HOME}/.zshrc"
+    echo "alias ubuntu='proot-distro login ubuntu'" >> "${HOME}/.zshrc"
+
+    teardown_proot 2>/dev/null || true
+    assert_file_not_contains "${HOME}/.zshrc" "alias ubuntu="
+    cleanup_sandbox "$sb"
+}
+it ".zshrc에서 distro alias를 제거한다" _test_teardown_removes_alias_from_zshrc
+
+_test_teardown_clears_config() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    proot_remove() { _record_call "proot_remove $*"; }
+
+    # config에 PROOT_DISTRO 설정
+    cat > "${HOME}/.config/termux-xfce/config" << 'EOF'
+PROOT_DISTRO="ubuntu"
+PROOT_USER="testuser"
+EOF
+
+    teardown_proot 2>/dev/null || true
+    assert_file_contains "${HOME}/.config/termux-xfce/config" 'PROOT_DISTRO=""'
+    cleanup_sandbox "$sb"
+}
+it "config 파일에서 PROOT_DISTRO를 비운다" _test_teardown_clears_config
+
+# =============================================================================
+# setup_proot_alias — bashrc/zshrc alias 추가
+# =============================================================================
+
+describe "proot_env — setup_proot_alias"
+
+_test_proot_alias_added_to_bashrc() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+
+    setup_proot_alias 2>/dev/null || true
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "alias ubuntu="
+    cleanup_sandbox "$sb"
+}
+it "bash.bashrc에 distro alias를 추가한다" _test_proot_alias_added_to_bashrc
+
+_test_proot_alias_added_to_zshrc() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    touch "${HOME}/.zshrc"
+
+    setup_proot_alias 2>/dev/null || true
+    assert_file_contains "${HOME}/.zshrc" "alias ubuntu="
+    cleanup_sandbox "$sb"
+}
+it ".zshrc에 distro alias를 추가한다" _test_proot_alias_added_to_zshrc
+
+_test_proot_alias_idempotent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+
+    setup_proot_alias 2>/dev/null || true
+    setup_proot_alias 2>/dev/null || true
+    local count
+    count=$(grep -c "alias ubuntu=" "${PREFIX}/etc/bash.bashrc")
+    assert_eq "1" "$count" "멱등성: alias가 1번만 있어야 한다"
+    cleanup_sandbox "$sb"
+}
+it "멱등성 — alias가 중복 추가되지 않는다" _test_proot_alias_idempotent
+
+_test_proot_alias_contains_env_u_ld_preload() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+
+    setup_proot_alias 2>/dev/null || true
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "env -u LD_PRELOAD"
+    cleanup_sandbox "$sb"
+}
+it "alias에 env -u LD_PRELOAD가 포함된다" _test_proot_alias_contains_env_u_ld_preload
+
+# =============================================================================
+# _generate_proot_fancybash — distro별 프롬프트 생성
+# =============================================================================
+
+describe "proot_env — _generate_proot_fancybash"
+
+_test_fancybash_generates_file() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    _make_proot_rootfs "$sb" "ubuntu" "testuser"
+
+    local dst="${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/home/testuser/.fancybash.sh"
+    _generate_proot_fancybash "$dst" 2>/dev/null || true
+    assert_file_exists "$dst"
+    cleanup_sandbox "$sb"
+}
+it "fancybash 파일을 생성한다" _test_fancybash_generates_file
+
+_test_fancybash_ubuntu_has_orange_color() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    _make_proot_rootfs "$sb" "ubuntu" "testuser"
+
+    local dst="${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/home/testuser/.fancybash.sh"
+    _generate_proot_fancybash "$dst" 2>/dev/null || true
+    assert_file_contains "$dst" "208"   # Ubuntu orange color code
+    assert_file_contains "$dst" "ubuntu"
+    cleanup_sandbox "$sb"
+}
+it "Ubuntu: 오렌지 컬러(208)와 distro명을 포함한다" _test_fancybash_ubuntu_has_orange_color
+
+_test_fancybash_arch_has_blue_color() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "archlinux" "testuser"
+    _make_proot_rootfs "$sb" "archlinux" "testuser"
+
+    local dst="${PREFIX}/var/lib/proot-distro/installed-rootfs/archlinux/home/testuser/.fancybash.sh"
+    _generate_proot_fancybash "$dst" 2>/dev/null || true
+    assert_file_contains "$dst" "75"    # Arch blue color code
+    assert_file_contains "$dst" "archlinux"
+    cleanup_sandbox "$sb"
+}
+it "Arch: 블루 컬러(75)와 distro명을 포함한다" _test_fancybash_arch_has_blue_color
+
+_test_fancybash_contains_git_branch() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    _make_proot_rootfs "$sb" "ubuntu" "testuser"
+
+    local dst="${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/home/testuser/.fancybash.sh"
+    _generate_proot_fancybash "$dst" 2>/dev/null || true
+    assert_file_contains "$dst" "__git_branch"
+    cleanup_sandbox "$sb"
+}
+it "git branch 표시 함수가 포함된다" _test_fancybash_contains_git_branch
+
+# =============================================================================
+# _setup_ubuntu_nimf — im-config 호출
+# =============================================================================
+
+describe "proot_env — _setup_ubuntu_nimf"
+
+_test_ubuntu_nimf_calls_im_config() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    reset_mock_calls
+
+    _setup_ubuntu_nimf 2>/dev/null || true
+    assert_was_called "im-config -n nimf"
+    cleanup_sandbox "$sb"
+}
+it "proot_exec로 im-config -n nimf를 호출한다" _test_ubuntu_nimf_calls_im_config
+
+# =============================================================================
+# _write_arch_im_env — nimf/fcitx5 분기 직접 검증
+# =============================================================================
+
+describe "proot_env — _write_arch_im_env"
+
+_test_write_arch_im_env_nimf() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "archlinux" "testuser"
+    _make_proot_rootfs "$sb" "archlinux" "testuser"
+    touch "${PREFIX}/var/lib/proot-distro/installed-rootfs/archlinux/home/testuser/.profile"
+
+    _write_arch_im_env true 2>/dev/null || true
+
+    local profile="${PREFIX}/var/lib/proot-distro/installed-rootfs/archlinux/home/testuser/.profile"
+    assert_file_contains "$profile" "GTK_IM_MODULE=nimf"
+    cleanup_sandbox "$sb"
+}
+it "use_nimf=true 시 nimf 환경변수를 쓴다" _test_write_arch_im_env_nimf
+
+_test_write_arch_im_env_fcitx5() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "archlinux" "testuser"
+    _make_proot_rootfs "$sb" "archlinux" "testuser"
+    touch "${PREFIX}/var/lib/proot-distro/installed-rootfs/archlinux/home/testuser/.profile"
+
+    _write_arch_im_env false 2>/dev/null || true
+
+    local profile="${PREFIX}/var/lib/proot-distro/installed-rootfs/archlinux/home/testuser/.profile"
+    assert_file_contains "$profile" "GTK_IM_MODULE=fcitx5"
+    cleanup_sandbox "$sb"
+}
+it "use_nimf=false 시 fcitx5 환경변수를 쓴다" _test_write_arch_im_env_fcitx5
+
 print_results

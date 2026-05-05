@@ -19,8 +19,16 @@ setup_xfce_packages() {
     # pkg install 중에 ~/Desktop에 .desktop 파일을 복사하려 시도하기 때문
     mkdir -p "$HOME/Desktop"
 
-    for p in "${PKGS_TERMUX_XFCE[@]}" "${PKGS_TERMUX_CLI[@]}"; do
-        pkg_is_installed "$p" || pkg_install "$p"
+    local -a _pkgs=("${PKGS_TERMUX_XFCE[@]}")
+    local total=${#_pkgs[@]} i=0
+    for p in "${_pkgs[@]}"; do
+        ((i++))
+        if pkg_is_installed "$p"; then
+            ui_info "  (${i}/${total}) ${p} — 이미 설치됨"
+        else
+            ui_info "  (${i}/${total}) ${p} 설치 중..."
+            pkg_install "$p"
+        fi
     done
 
     # Firefox 데스크탑 아이콘
@@ -79,6 +87,11 @@ setup_xfce_autostart() {
     _migrate_fix_x11_input
     _migrate_flameshot_native
     _migrate_terminal_font
+    _migrate_borderless_maximize
+    _migrate_disable_compositing
+    _migrate_remove_actions_plugin
+    _migrate_dbus_propagate_path
+    _migrate_conky_exec_ampersand
 }
 
 # -----------------------------------------------------------------------------
@@ -243,4 +256,56 @@ _migrate_terminal_font() {
     if [ -f "$xml" ] && grep -qE "name=\"font-name\"[^/]*value=\"($old)" "$xml" 2>/dev/null; then
         sed -i -E "s#(name=\"font-name\"[^/]*value=)\"($old)[^\"]*\"#\\1\"${target}\"#" "$xml"
     fi
+}
+
+# 기존 설치본의 borderless_maximize 끄기 — 최대화 시 타이틀바(닫기 버튼) 숨김 방지
+# Why: borderless_maximize=true면 최대화된 창의 닫기/최소화 버튼이 사라져
+#      모바일 환경에서 창을 닫을 방법이 없어짐
+_migrate_borderless_maximize() {
+    local xml="$HOME/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml"
+    [ -f "$xml" ] || return 0
+    grep -q 'name="borderless_maximize"[^/]*value="true"' "$xml" 2>/dev/null || return 0
+    sed -i 's#name="borderless_maximize" type="bool" value="true"#name="borderless_maximize" type="bool" value="false"#' "$xml"
+}
+
+# 기존 설치본의 컴포지터 끄기 — Zink(GPU) + 컴포지터 조합이 검은 화면 유발
+# Why: Adreno GPU에서 MESA_LOADER_DRIVER_OVERRIDE=zink + use_compositing=true면
+#      Termux:X11 화면이 검은색으로만 표시되어 데스크탑을 사용할 수 없음
+_migrate_disable_compositing() {
+    local xml="$HOME/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml"
+    [ -f "$xml" ] || return 0
+    grep -q 'name="use_compositing"[^/]*value="true"' "$xml" 2>/dev/null || return 0
+    sed -i 's#name="use_compositing" type="bool" value="true"#name="use_compositing" type="bool" value="false"#' "$xml"
+}
+
+# 패널에서 XFCE actions 플러그인 제거 — Termux에 systemd/logind 없어서
+# shutdown/reboot 비활성화, logout도 정상 종료 불가 → Kill Termux X11 버튼만 유지
+_migrate_remove_actions_plugin() {
+    local xml="$HOME/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
+    [ -f "$xml" ] || return 0
+    grep -q 'value="actions"' "$xml" 2>/dev/null || return 0
+    # plugin-ids에서 plugin-20 제거
+    sed -i '/<value type="int" value="20"\/>/d' "$xml"
+    # actions 플러그인 정의 블록 제거
+    sed -i '/<property name="plugin-20".*value="actions">/,/<\/property>/d' "$xml"
+}
+
+# 기존 설치본의 dbus-propagate autostart에서 /usr/bin/env → bash 직접 호출로 전환
+# Why: Termux에는 /usr/bin/env가 없어 XFCE autostart 실행 시 절대경로 해석 실패
+#      → dbus activation 환경 전파가 완전히 무동작 상태
+_migrate_dbus_propagate_path() {
+    local desktop="$HOME/.config/autostart/00-env-dbus-propagate.desktop"
+    [ -f "$desktop" ] || return 0
+    grep -q '/usr/bin/env' "$desktop" 2>/dev/null || return 0
+    sed -i 's|Exec=/usr/bin/env bash|Exec=bash|' "$desktop"
+}
+
+# 기존 설치본의 conky autostart Exec 끝 '&' 제거
+# Why: desktop entry 스펙에서 Exec 값은 셸 해석 없이 직접 실행되므로
+#      '&'가 conky 인자로 전달되어 실행 실패 가능
+_migrate_conky_exec_ampersand() {
+    local desktop="$HOME/.config/autostart/conky.desktop"
+    [ -f "$desktop" ] || return 0
+    grep -q 'Exec=.*&$' "$desktop" 2>/dev/null || return 0
+    sed -i 's| &$||' "$desktop"
 }

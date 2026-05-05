@@ -505,6 +505,67 @@ _test_migrate_flameshot_native() {
 it "기존 설치본의 flameshot autostart prun→native 마이그레이션" _test_migrate_flameshot_native
 
 # =============================================================================
+# Regression #7: startXFCE PulseAudio exit-idle-time
+# -----------------------------------------------------------------------------
+# PulseAudio --exit-idle-time=120 → 2분 유휴 후 자동 종료
+# XFCE 세션 내 PULSE_SERVER env가 설정된 상태에서 pulseaudio 재시작 차단됨
+# → --exit-idle-time=-1 로 변경
+# =============================================================================
+
+describe "e2e — startXFCE PulseAudio 설정 (exit-idle-time)"
+
+_test_startxfce_pulseaudio_no_idle_exit() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    _setup_start_xfce
+
+    local script="${HOME}/.shortcuts/startXFCE"
+    assert_file_exists "$script"
+
+    # exit-idle-time=-1 이어야 함 (양수면 세션 중 PulseAudio 종료 위험)
+    if grep -q 'exit-idle-time=120' "$script"; then
+        echo "[ASSERT] startXFCE에 exit-idle-time=120 (2분) 설정이 남아있음" >&2
+        return 1
+    fi
+    assert_file_contains "$script" "exit-idle-time=-1"
+
+    cleanup_sandbox "$sb"
+}
+it "PulseAudio가 유휴 시 자동 종료되지 않는다 (exit-idle-time=-1)" _test_startxfce_pulseaudio_no_idle_exit
+
+# =============================================================================
+# Regression #8: autostart 경로/문법 문제
+# -----------------------------------------------------------------------------
+# 00-env-dbus-propagate.desktop: /usr/bin/env → Termux에 없음
+# conky.desktop: Exec 끝 '&' → desktop entry 스펙 위반
+# =============================================================================
+
+describe "e2e — autostart desktop 파일 유효성"
+
+_test_dbus_propagate_no_usr_bin_env() {
+    local desktop="${REPO_ROOT}/tar/config/.config/autostart/00-env-dbus-propagate.desktop"
+    assert_file_exists "$desktop"
+
+    if grep -q '/usr/bin/env' "$desktop"; then
+        echo "[ASSERT] /usr/bin/env 경로가 남아있음 — Termux에서 실행 불가" >&2
+        return 1
+    fi
+    assert_file_contains "$desktop" "Exec=bash"
+}
+it "dbus-propagate autostart에 /usr/bin/env 경로가 없다" _test_dbus_propagate_no_usr_bin_env
+
+_test_conky_desktop_no_trailing_ampersand() {
+    local desktop="${REPO_ROOT}/tar/config/.config/autostart/conky.desktop"
+    assert_file_exists "$desktop"
+
+    if grep -q 'Exec=.*&$' "$desktop"; then
+        echo "[ASSERT] conky Exec 끝에 '&'가 남아있음 — desktop entry 스펙 위반" >&2
+        return 1
+    fi
+}
+it "conky autostart Exec에 trailing &가 없다" _test_conky_desktop_no_trailing_ampersand
+
+# =============================================================================
 # 결과 출력
 # =============================================================================
 print_results

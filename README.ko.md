@@ -205,21 +205,23 @@ app-installer
 ## 테스트
 
 ```bash
-bash tests/run_tests.sh              # 전체 (141개)
+bash tests/run_tests.sh              # 전체 (280개)
 bash tests/run_tests.sh domain_termux
-bash tests/run_tests.sh app_installer
+bash tests/run_tests.sh domain_locale_ko
 ```
 
 | 스위트 | 수 | 내용 |
 |--------|---|------|
 | ports | 7 | 어댑터 계약 준수 |
-| adapters | 12 | pkg_termux, ui_terminal |
-| domain_termux | 25 | termux_env 로직 |
-| domain_xfce | 18 | xfce_env 로직 |
-| domain_proot | 25 | proot_env 로직 |
-| app_installer | 39 | 설치 스크립트 검증 |
-| prun_ld_preload | 15 | prun / LD_PRELOAD 회귀 |
-| **합계** | **141** | **실기기 전체 통과** |
+| adapters | 24 | pkg_termux, ui_terminal, script_builder_zenity |
+| domain_termux | 45 | termux_env 로직 |
+| domain_xfce | 34 | xfce_env + 마이그레이션 로직 |
+| domain_proot | 58 | proot_env 로직 (Ubuntu/Arch) |
+| domain_locale_ko | 18 | locale_ko 로직 (한글 로케일) |
+| app_installer | 50 | 설치 스크립트 검증 |
+| prun_ld_preload | 17 | prun / LD_PRELOAD 회귀 |
+| e2e_install | 27 | E2E 통합 & 회귀 테스트 |
+| **합계** | **280** | **실기기 전체 통과** |
 
 ## Android 시스템 최적화
 
@@ -273,6 +275,7 @@ Termux_XFCE/
 ├── install.sh                    ← 진입점 + DI 컨테이너
 ├── ports/
 │   ├── pkg_manager.sh            ← 패키지 관리 계약
+│   ├── script_builder.sh         ← 런타임 스크립트 빌더 계약
 │   └── ui.sh                     ← UI 계약
 ├── adapters/
 │   ├── input/
@@ -282,6 +285,8 @@ Termux_XFCE/
 │       ├── pkg_termux.sh         ← Termux pkg 어댑터
 │       ├── pkg_ubuntu.sh         ← Ubuntu apt 어댑터
 │       ├── pkg_arch.sh           ← Arch pacman 어댑터
+│       ├── pkg_common_termux.sh  ← Termux 공통 pkg 헬퍼
+│       ├── script_builder_zenity.sh ← startXFCE / kill / cp2menu 스크립트 생성기
 │       ├── ui_terminal.sh        ← echo 기반 UI
 │       ├── ui_yad.sh             ← yad 검색 GUI (zenity 상위호환)
 │       └── ui_zenity.sh          ← zenity GUI UI (폴백)
@@ -291,9 +296,12 @@ Termux_XFCE/
 │   ├── xfce_env.sh               ← XFCE 설정 로직
 │   ├── proot_env.sh              ← proot 로직 (Ubuntu/Arch 공통)
 │   └── locale_ko.sh              ← 한글 로케일 옵트인 (LD_PRELOAD gettext 후킹)
+├── tar/
+│   ├── config/                   ← XFCE / autostart 프리셋 설정
+│   └── conky/                    ← Conky 테마 (Alterf)
 ├── assets/
 │   └── force_gettext.c           ← gettext 후킹 C 소스 (→ force_gettext.so)
-├── tests/                        ← 자동화 테스트 141개
+├── tests/                        ← 자동화 테스트 280개 (9개 스위트)
 └── app-installer/                ← 앱 추가 설치 GUI (Git Submodule)
 ```
 

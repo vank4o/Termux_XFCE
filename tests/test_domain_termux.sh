@@ -8,6 +8,7 @@ source "${SCRIPT_DIR}/framework.sh"
 source "${SCRIPT_DIR}/mocks.sh"
 
 DOMAIN_DIR="${SCRIPT_DIR}/../domain"
+_REAL_PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 _load_domain() {
     local sandbox="$1"
@@ -52,6 +53,20 @@ _test_props_idempotent() {
     cleanup_sandbox "$sb"
 }
 it "멱등성 — 이미 설정된 경우 중복 추가하지 않는다" _test_props_idempotent
+
+_test_props_appends_when_no_comment() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    # 주석 라인 없이 빈 properties 파일
+    echo "# 임의 설정" > "${HOME}/.termux/termux.properties"
+
+    _setup_termux_properties
+    assert_file_contains "${HOME}/.termux/termux.properties" "^allow-external-apps = true"
+    assert_file_contains "${HOME}/.termux/termux.properties" "^bell-character = ignore"
+    cleanup_sandbox "$sb"
+}
+it "주석 라인 없으면 직접 추가한다 (폴백)" _test_props_appends_when_no_comment
 
 # =============================================================================
 # _setup_aliases
@@ -147,23 +162,20 @@ _test_startxfce_has_gpu_detection() {
 }
 it "startXFCE에 GPU 자동 감지 로직이 있다" _test_startxfce_has_gpu_detection
 
-_test_startxfce_idempotent() {
+_test_startxfce_overwrites_on_update() {
     local sb; sb=$(make_sandbox)
     _load_domain "$sb"
 
+    # 구버전 startXFCE
+    echo "old_version" > "${HOME}/.shortcuts/startXFCE"
+
     _setup_start_xfce
-    local mtime1
-    mtime1=$(stat -c %Y "${HOME}/.shortcuts/startXFCE")
 
-    sleep 1
-    _setup_start_xfce  # 두 번째 호출
-
-    local mtime2
-    mtime2=$(stat -c %Y "${HOME}/.shortcuts/startXFCE")
-    assert_eq "$mtime1" "$mtime2" "멱등성: 이미 존재하면 덮어쓰지 않는다"
+    # 새 내용으로 덮어씀 (가드 없음 — 업데이트 보장)
+    assert_file_contains "${HOME}/.shortcuts/startXFCE" "termux-x11"
     cleanup_sandbox "$sb"
 }
-it "멱등성 — startXFCE가 이미 있으면 덮어쓰지 않는다" _test_startxfce_idempotent
+it "startXFCE를 항상 최신 버전으로 재생성한다" _test_startxfce_overwrites_on_update
 
 # =============================================================================
 # _setup_prun
@@ -193,19 +205,18 @@ _test_prun_has_config_source() {
 }
 it "prun은 config에서 DISTRO를 읽는다" _test_prun_has_config_source
 
-_test_prun_idempotent() {
+_test_prun_overwrites_old_version() {
     local sb; sb=$(make_sandbox)
     _load_domain "$sb"
 
+    echo "old_version" > "${PREFIX}/bin/prun"
     _setup_prun
-    local mtime1; mtime1=$(stat -c %Y "${PREFIX}/bin/prun")
-    sleep 1
-    _setup_prun
-    local mtime2; mtime2=$(stat -c %Y "${PREFIX}/bin/prun")
-    assert_eq "$mtime1" "$mtime2" "멱등성: prun이 이미 있으면 덮어쓰지 않는다"
+
+    # 최신 내용으로 갱신됨 (가드 없음 — test_prun_ld_preload.sh와 일관)
+    assert_file_contains "${PREFIX}/bin/prun" "proot-distro login"
     cleanup_sandbox "$sb"
 }
-it "멱등성 — prun이 이미 있으면 덮어쓰지 않는다" _test_prun_idempotent
+it "prun을 항상 최신 버전으로 재생성한다" _test_prun_overwrites_old_version
 
 # =============================================================================
 # _setup_cp2menu
@@ -518,5 +529,268 @@ EOF
     cleanup_sandbox "$sb"
 }
 it "Name= 필드를 prun-gui 앱 이름으로 사용한다" _test_migrate_uses_name_field
+
+# =============================================================================
+# _append_to_rc — RC 파일 멱등 추가 유틸
+# =============================================================================
+
+describe "termux_env — _append_to_rc"
+
+_test_append_to_rc_adds_content() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    _append_to_rc "# test-marker" "# test-marker\nexport FOO=bar" "${PREFIX}/etc/bash.bashrc"
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "test-marker"
+    cleanup_sandbox "$sb"
+}
+it "마커가 없으면 내용을 추가한다" _test_append_to_rc_adds_content
+
+_test_append_to_rc_idempotent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    _append_to_rc "# test-marker" "# test-marker\nexport FOO=bar" "${PREFIX}/etc/bash.bashrc"
+    _append_to_rc "# test-marker" "# test-marker\nexport FOO=bar" "${PREFIX}/etc/bash.bashrc"
+
+    local count
+    count=$(grep -c "test-marker" "${PREFIX}/etc/bash.bashrc")
+    assert_eq "1" "$count"
+    cleanup_sandbox "$sb"
+}
+it "멱등성 — 마커가 이미 있으면 중복 추가하지 않는다" _test_append_to_rc_idempotent
+
+# =============================================================================
+# _setup_xdg_runtime — XDG_RUNTIME_DIR mode 700
+# =============================================================================
+
+describe "termux_env — _setup_xdg_runtime"
+
+_test_xdg_runtime_written() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    _setup_xdg_runtime
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "termux-xfce-xdg-runtime"
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "XDG_RUNTIME_DIR"
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "chmod 700"
+    cleanup_sandbox "$sb"
+}
+it "bash.bashrc에 XDG_RUNTIME_DIR 블록을 추가한다" _test_xdg_runtime_written
+
+_test_xdg_runtime_idempotent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    _setup_xdg_runtime
+    _setup_xdg_runtime
+
+    local count
+    count=$(grep -c "termux-xfce-xdg-runtime" "${PREFIX}/etc/bash.bashrc")
+    assert_eq "1" "$count"
+    cleanup_sandbox "$sb"
+}
+it "멱등성 — XDG_RUNTIME_DIR 블록이 중복 추가되지 않는다" _test_xdg_runtime_idempotent
+
+_test_xdg_runtime_removes_old_tmpdir_line() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    # 구버전 라인 삽입 (마이그레이션 대상)
+    echo 'export XDG_RUNTIME_DIR="${TMPDIR:-/data/data/com.termux/files/usr/tmp}"' >> "${PREFIX}/etc/bash.bashrc"
+
+    _setup_xdg_runtime
+
+    assert_file_not_contains "${PREFIX}/etc/bash.bashrc" 'XDG_RUNTIME_DIR="${TMPDIR'
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "termux-xfce-xdg-runtime"
+    cleanup_sandbox "$sb"
+}
+it "구버전 TMPDIR 기반 XDG_RUNTIME_DIR 라인을 제거한다" _test_xdg_runtime_removes_old_tmpdir_line
+
+# =============================================================================
+# _setup_gpu_env — GPU 환경변수 RC 추가
+# =============================================================================
+
+describe "termux_env — _setup_gpu_env"
+
+_test_gpu_env_written() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    _setup_gpu_env
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "termux-xfce-gpu"
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "MESA_LOADER_DRIVER_OVERRIDE"
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "GSK_RENDERER=cairo"
+    cleanup_sandbox "$sb"
+}
+it "bash.bashrc에 GPU 환경변수 블록을 추가한다" _test_gpu_env_written
+
+_test_gpu_env_idempotent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    _setup_gpu_env
+    _setup_gpu_env
+
+    local count
+    count=$(grep -c "termux-xfce-gpu" "${PREFIX}/etc/bash.bashrc")
+    assert_eq "1" "$count"
+    cleanup_sandbox "$sb"
+}
+it "멱등성 — GPU 블록이 중복 추가되지 않는다" _test_gpu_env_idempotent
+
+# =============================================================================
+# _setup_prun_gui — prun-gui 스크립트 생성
+# =============================================================================
+
+describe "termux_env — _setup_prun_gui"
+
+_test_prun_gui_created() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    _setup_prun_gui
+    assert_file_exists "${PREFIX}/bin/prun-gui"
+    [ -x "${PREFIX}/bin/prun-gui" ]
+    assert_file_contains "${PREFIX}/bin/prun-gui" "notify-send"
+    assert_file_contains "${PREFIX}/bin/prun-gui" "exec prun"
+    cleanup_sandbox "$sb"
+}
+it "prun-gui 스크립트를 생성한다" _test_prun_gui_created
+
+_test_prun_gui_syntax_valid() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    _setup_prun_gui
+    bash -n "${PREFIX}/bin/prun-gui"
+    cleanup_sandbox "$sb"
+}
+it "prun-gui 스크립트의 bash 문법 오류가 없다" _test_prun_gui_syntax_valid
+
+# =============================================================================
+# _setup_app_installer — bin + desktop + 바탕화면 아이콘
+# =============================================================================
+
+describe "termux_env — _setup_app_installer"
+
+_test_app_installer_created() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    export SCRIPT_DIR="${_REAL_PROJECT_DIR}"
+
+    _setup_app_installer
+    assert_file_exists "${PREFIX}/bin/app-installer"
+    assert_file_exists "${PREFIX}/share/applications/app-installer.desktop"
+    assert_file_exists "${HOME}/Desktop/App-Installer.desktop"
+    [ -x "${PREFIX}/bin/app-installer" ]
+    cleanup_sandbox "$sb"
+}
+it "app-installer bin, desktop, 바탕화면 아이콘을 생성한다" _test_app_installer_created
+
+_test_app_installer_idempotent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    export SCRIPT_DIR="${_REAL_PROJECT_DIR}"
+
+    _setup_app_installer
+    local mtime1; mtime1=$(stat -c %Y "${PREFIX}/bin/app-installer")
+    sleep 1
+    _setup_app_installer
+    local mtime2; mtime2=$(stat -c %Y "${PREFIX}/bin/app-installer")
+
+    assert_eq "$mtime1" "$mtime2" "멱등성: 이미 있으면 덮어쓰지 않는다"
+    cleanup_sandbox "$sb"
+}
+it "멱등성 — app-installer가 이미 있으면 덮어쓰지 않는다" _test_app_installer_idempotent
+
+# =============================================================================
+# _install_base_packages — 패키지 설치 루프
+# =============================================================================
+
+describe "termux_env — _install_base_packages"
+
+_test_base_pkgs_installs_missing() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS=""
+
+    _install_base_packages 2>/dev/null || true
+    assert_was_called "pkg_install"
+    cleanup_sandbox "$sb"
+}
+it "미설치 패키지에 대해 pkg_install을 호출한다" _test_base_pkgs_installs_missing
+
+_test_base_pkgs_skips_installed() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS="${PKGS_TERMUX_BASE[*]} ${PKGS_TERMUX_CLI[*]} ${PKGS_TERMUX_PROOT[*]} dbus"
+
+    _install_base_packages 2>/dev/null || true
+    # dbus remove는 항상 호출되지만 다른 pkg_install은 없어야 함
+    local install_count=0
+    for call in "${MOCK_CALLS[@]:-}"; do
+        [[ "$call" == pkg_install* ]] && ((install_count++))
+    done
+    # dbus는 remove 후 재설치되므로 dbus 1건만 허용
+    [ "$install_count" -le 1 ]
+    cleanup_sandbox "$sb"
+}
+it "멱등성 — 이미 설치된 패키지는 건너뛴다" _test_base_pkgs_skips_installed
+
+# =============================================================================
+# setup_termux_gpu_dev — GPU 개발 도구 패키지 루프
+# =============================================================================
+
+describe "termux_env — setup_termux_gpu_dev"
+
+_test_gpu_dev_installs_pkgs() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS=""
+
+    setup_termux_gpu_dev 2>/dev/null || true
+    assert_was_called "pkg_install"
+    cleanup_sandbox "$sb"
+}
+it "GPU 개발 패키지 미설치 시 pkg_install을 호출한다" _test_gpu_dev_installs_pkgs
+
+_test_gpu_dev_skips_installed() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS="${PKGS_TERMUX_GPU_DEV[*]}"
+
+    setup_termux_gpu_dev 2>/dev/null || true
+    assert_not_called "pkg_install"
+    cleanup_sandbox "$sb"
+}
+it "멱등성 — GPU 개발 패키지가 이미 설치된 경우 건너뛴다" _test_gpu_dev_skips_installed
+
+# =============================================================================
+# setup_termux_shortcuts — composition 함수 검증
+# =============================================================================
+
+describe "termux_env — setup_termux_shortcuts (composition)"
+
+_test_shortcuts_creates_all() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    export SCRIPT_DIR="${_REAL_PROJECT_DIR}"
+
+    setup_termux_shortcuts 2>/dev/null || true
+
+    assert_file_exists "${HOME}/.shortcuts/startXFCE"
+    assert_file_exists "${PREFIX}/bin/prun"
+    assert_file_exists "${PREFIX}/bin/prun-gui"
+    assert_file_exists "${PREFIX}/bin/cp2menu"
+    assert_file_exists "${PREFIX}/bin/kill_termux_x11"
+    assert_file_exists "${PREFIX}/bin/app-installer"
+    cleanup_sandbox "$sb"
+}
+it "모든 유틸리티 스크립트를 생성한다" _test_shortcuts_creates_all
 
 print_results
