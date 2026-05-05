@@ -29,8 +29,16 @@ if [ ! -d "$SCRIPT_DIR/domain" ]; then
     echo "[INFO] 저장소를 클론합니다..."
     local_dir="$HOME/.termux-xfce-installer"
     rm -rf "$local_dir"
-    git clone --depth=1 -b "${INSTALL_BRANCH:-main}" --recurse-submodules \
+    git clone --depth=1 -b "${INSTALL_BRANCH:-main}" \
         https://github.com/yanghoeg/Termux_XFCE.git "$local_dir"
+
+    # 서브모듈은 핀이 깨져도(고아 커밋 등) main HEAD로 fallback
+    if ! git -C "$local_dir" submodule update --init --depth=1 2>/dev/null; then
+        echo "[WARN] 서브모듈 핀이 원격에 없습니다 — App-Installer main HEAD로 fallback합니다."
+        rm -rf "$local_dir/app-installer" "$local_dir/.git/modules/app-installer"
+        sub_url=$(git -C "$local_dir" config --file .gitmodules submodule.app-installer.url)
+        git clone --depth=1 "$sub_url" "$local_dir/app-installer"
+    fi
     exec bash "$local_dir/install.sh" "$@"
 fi
 
