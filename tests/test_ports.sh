@@ -9,7 +9,7 @@ source "${SCRIPT_DIR}/framework.sh"
 
 ADAPTER_DIR="${SCRIPT_DIR}/../adapters/output"
 
-# pkg_manager 포트가 요구하는 함수 목록
+# pkg_manager 포트가 요구하는 함수 목록 — ports/pkg_manager.sh와 1:1 일치 필요
 PKG_MANAGER_CONTRACTS=(
     pkg_update
     pkg_upgrade
@@ -18,8 +18,16 @@ PKG_MANAGER_CONTRACTS=(
     pkg_is_installed
     pkg_autoremove
     proot_exec
+    proot_exec_root
+    proot_install
+    proot_remove
     proot_pkg_install
+    proot_pkg_install_root
     proot_pkg_is_installed
+    proot_pkg_update
+    proot_pkg_update_root
+    proot_pkg_remove
+    proot_pkg_autoremove
 )
 
 # ui 포트가 요구하는 함수 목록
@@ -30,6 +38,13 @@ UI_CONTRACTS=(
     ui_select
     ui_confirm
     ui_input
+)
+
+# script_builder 포트가 요구하는 함수 목록
+SCRIPT_BUILDER_CONTRACTS=(
+    script_build_start_xfce
+    script_build_kill_x11
+    script_build_cp2menu
 )
 
 _check_adapter_contracts() {
@@ -97,6 +112,20 @@ _test_ui_zenity_contracts() {
     ( _check_adapter_contracts "${ADAPTER_DIR}/ui_zenity.sh" "${UI_CONTRACTS[@]}" )
 }
 it "ui_zenity.sh가 모든 ui 계약을 구현한다" _test_ui_zenity_contracts
+
+# =============================================================================
+# script_builder 계약 — 모든 script_builder_*.sh 어댑터
+# =============================================================================
+
+describe "포트 계약 — script_builder_zenity.sh"
+
+_test_script_builder_zenity_contracts() {
+    if [ ! -f "${ADAPTER_DIR}/script_builder_zenity.sh" ]; then
+        return 0
+    fi
+    ( _check_adapter_contracts "${ADAPTER_DIR}/script_builder_zenity.sh" "${SCRIPT_BUILDER_CONTRACTS[@]}" )
+}
+it "script_builder_zenity.sh가 모든 script_builder 계약을 구현한다" _test_script_builder_zenity_contracts
 
 # =============================================================================
 # _pkg_manager_check — 어댑터 미로드 시 에러

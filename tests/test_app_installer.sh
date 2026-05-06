@@ -164,6 +164,72 @@ _test_config_fallback() {
 it "config 없을 때 PROOT_DISTRO=ubuntu로 fallback한다" _test_config_fallback
 
 # =============================================================================
+# install.sh — _detect_proot_user (P1-3 회귀: glob 미매치 시 literal "*" 폭탄)
+# =============================================================================
+
+describe "app-installer/install.sh — _detect_proot_user"
+
+# install.sh의 _detect_proot_user만 추출해서 source (다른 부분 부작용 회피)
+_load_detect_only() {
+    local tmp="${TMPDIR}/detect_only_$$.sh"
+    awk '
+        /^_detect_proot_user\(\) \{/{ in_fn=1 }
+        in_fn{ print }
+        in_fn && /^\}/{ exit }
+    ' "${APP_DIR}/install.sh" > "$tmp"
+    source "$tmp"
+    rm -f "$tmp"
+}
+
+_test_detect_proot_user_picks_first_home() {
+    local sb; sb=$(make_sandbox)
+    export PREFIX="${sb}/usr"
+    export PROOT_DISTRO="ubuntu"
+    mkdir -p "${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/home/alice"
+    _load_detect_only
+    local got; got=$(_detect_proot_user)
+    assert_eq "alice" "$got" "single home dir"
+    cleanup_sandbox "$sb"
+}
+it "home에 사용자 1명 → 그 이름 반환" _test_detect_proot_user_picks_first_home
+
+_test_detect_proot_user_no_home_returns_user() {
+    local sb; sb=$(make_sandbox)
+    export PREFIX="${sb}/usr"
+    export PROOT_DISTRO="ubuntu"
+    # home 디렉토리는 만들지만 사용자 dir 없음 → glob 미매치
+    mkdir -p "${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/home"
+    _load_detect_only
+    local got; got=$(_detect_proot_user)
+    assert_eq "user" "$got" "empty home → fallback (P1-3 핵심: literal '*' 반환 차단)"
+    cleanup_sandbox "$sb"
+}
+it "home이 비어있을 때 'user' 폴백 (glob '*' 폭탄 차단)" _test_detect_proot_user_no_home_returns_user
+
+_test_detect_proot_user_no_proot_returns_user() {
+    local sb; sb=$(make_sandbox)
+    export PREFIX="${sb}/usr"
+    export PROOT_DISTRO="ubuntu"
+    # proot-distro 자체 미설치 → installed-rootfs 디렉토리 없음
+    _load_detect_only
+    local got; got=$(_detect_proot_user)
+    assert_eq "user" "$got" "proot 미설치 → fallback"
+    cleanup_sandbox "$sb"
+}
+it "proot 미설치 시 'user' 폴백" _test_detect_proot_user_no_proot_returns_user
+
+_test_detect_proot_user_distro_unset_returns_user() {
+    local sb; sb=$(make_sandbox)
+    export PREFIX="${sb}/usr"
+    unset PROOT_DISTRO
+    _load_detect_only
+    local got; got=$(_detect_proot_user)
+    assert_eq "user" "$got" "PROOT_DISTRO 미설정 → fallback"
+    cleanup_sandbox "$sb"
+}
+it "PROOT_DISTRO 미설정 시 set -u에서 트립하지 않고 'user' 반환" _test_detect_proot_user_distro_unset_returns_user
+
+# =============================================================================
 # 구 API(check_*_installed, _action)는 헥사고날 리팩토링으로 제거됨
 # 새 API: app_is_installed_<id> / app_install_<id> / app_remove_<id> (domain/installers/*.sh)
 # 새 API용 테스트는 별도 추가 필요 (TODO)

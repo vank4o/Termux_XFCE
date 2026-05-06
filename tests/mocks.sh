@@ -53,13 +53,20 @@ mock_pkg_adapter() {
         local pkg="$1"
         echo "$MOCK_INSTALLED_PKGS" | grep -qw "$pkg"
     }
-    proot_exec()          { _record_call "proot_exec $*"; shift; bash -c "$*" 2>/dev/null || true; }
-    proot_exec_root()     { _record_call "proot_exec $*"; shift; bash -c "$*" 2>/dev/null || true; }
+    # NOTE: 옛 구현(`shift; bash -c "$*"`)은 첫 인자(보통 "bash")를 떨어뜨린 뒤
+    # 잔여 `-c "..."` 를 다시 `bash -c "..."` 로 감싸 invalid option 에러로 침묵 종료했다.
+    # 글로벌 mock은 호출 기록만 남기고 inner 명령은 실행하지 않는다.
+    # inner 명령의 side-effect 검증이 필요한 테스트는 자체 proot_exec 재정의 사용.
+    proot_exec()          { _record_call "proot_exec $*"; return 0; }
+    proot_exec_root()     { _record_call "proot_exec_root $*"; return 0; }
     proot_install()       { _record_call "proot-distro install $*"; }
+    proot_remove()        { _record_call "proot_remove $*"; }
     proot_pkg_install()   { _record_call "proot_pkg_install $*"; }
     proot_pkg_install_root() { _record_call "proot_pkg_install_root $*"; }
     proot_pkg_update()    { _record_call "proot_pkg_update"; }
-    proot_pkg_update_root() { _record_call "proot_pkg_update"; }
+    proot_pkg_update_root() { _record_call "proot_pkg_update_root"; }
+    proot_pkg_remove()    { _record_call "proot_pkg_remove $*"; }
+    proot_pkg_autoremove() { _record_call "proot_pkg_autoremove"; }
     proot_pkg_is_installed() { return 1; }  # 기본: 미설치
 }
 
