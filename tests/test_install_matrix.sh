@@ -133,7 +133,7 @@ _test_minimal_native() {
 it "최소 native (no-gpu, no-korean) — proot/gpu/korean 호출 없음" _test_minimal_native
 
 _test_native_with_gpu() {
-    _run_install --no-proot --gpu --no-korean
+    _run_install --no-proot --gpu --no-gpu-dev --no-korean
     _assert_traced "setup_termux_gpu"
     _assert_not_traced "setup_termux_gpu_dev"
     _assert_not_traced "setup_proot_install"
@@ -191,7 +191,7 @@ it "Arch proot-only — native 모두 생략, proot만 실행" _test_proot_only_
 describe "matrix — 풀 설치 (native + proot)"
 
 _test_full_ubuntu() {
-    _run_install --distro ubuntu --user testuser --gpu --no-korean
+    _run_install --distro ubuntu --user testuser --gpu --no-gpu-dev --no-korean
     _assert_traced "setup_termux_base"
     _assert_traced "setup_termux_gpu"
     _assert_traced "setup_proot_install"
@@ -240,7 +240,8 @@ _test_env_vars_no_proot() {
 it "SKIP_PROOT=true SKIP_KOREAN=true INSTALL_GPU=false" _test_env_vars_no_proot
 
 _test_env_vars_full() {
-    DISTRO=ubuntu USERNAME=testuser INSTALL_GPU=true SKIP_KOREAN=true _run_install
+    DISTRO=ubuntu USERNAME=testuser INSTALL_GPU=true INSTALL_GPU_DEV=false \
+        SKIP_KOREAN=true _run_install
     _assert_traced "setup_termux_base"
     _assert_traced "setup_termux_gpu"
     _assert_traced "setup_proot_install"
@@ -254,9 +255,9 @@ it "DISTRO=ubuntu USERNAME=testuser INSTALL_GPU=true" _test_env_vars_full
 describe "matrix — CLI 인자 검증"
 
 _test_help_exits_zero() {
+    local rc=0
     HOME="$(mktemp -d)" PREFIX="$(mktemp -d)" \
-        bash "$REPO_ROOT/install.sh" --help >/dev/null 2>&1
-    local rc=$?
+        bash "$REPO_ROOT/install.sh" --help >/dev/null 2>&1 || rc=$?
     if [ "$rc" -ne 0 ]; then
         echo "[ASSERT] --help should exit 0, got $rc" >&2
         return 1
@@ -265,9 +266,10 @@ _test_help_exits_zero() {
 it "--help는 exit 0으로 종료" _test_help_exits_zero
 
 _test_unknown_arg_exits_nonzero() {
+    # set -e 트립 방지: 비정상 종료를 기대하므로 || rc=$? 로 캡처
+    local rc=0
     HOME="$(mktemp -d)" PREFIX="$(mktemp -d)" \
-        bash "$REPO_ROOT/install.sh" --not-a-real-flag >/dev/null 2>&1
-    local rc=$?
+        bash "$REPO_ROOT/install.sh" --not-a-real-flag >/dev/null 2>&1 || rc=$?
     if [ "$rc" -eq 0 ]; then
         echo "[ASSERT] unknown flag should exit non-zero, got 0" >&2
         return 1
@@ -276,10 +278,11 @@ _test_unknown_arg_exits_nonzero() {
 it "알 수 없는 인자는 non-zero exit" _test_unknown_arg_exits_nonzero
 
 _test_invalid_distro_exits_nonzero() {
+    local rc=0
     _INSTALL_HOOK="$HOOK_FILE" _TRACE_FILE="$TRACE_FILE" \
     HOME="$(mktemp -d)" PREFIX="$(mktemp -d)" \
-        bash "$REPO_ROOT/install.sh" --distro freebsd --user testuser --no-gpu --no-korean >/dev/null 2>&1
-    local rc=$?
+        bash "$REPO_ROOT/install.sh" --distro freebsd --user testuser --no-gpu --no-gpu-dev --no-korean \
+        >/dev/null 2>&1 || rc=$?
     if [ "$rc" -eq 0 ]; then
         echo "[ASSERT] invalid distro should exit non-zero, got 0" >&2
         return 1
