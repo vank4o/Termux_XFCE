@@ -70,7 +70,7 @@ setup_proot_base_packages() {
             local -a _pkgs=("${PKGS_PROOT_UBUNTU_BASE[@]}" "${PKGS_PROOT_UBUNTU_DESKTOP[@]}")
             local _total=${#_pkgs[@]} _i=0
             for p in "${_pkgs[@]}"; do
-                ((_i++))
+                ((++_i))
                 if proot_pkg_is_installed "$p"; then
                     ui_info "  (${_i}/${_total}) ${p} — 이미 설치됨"
                 else
@@ -83,7 +83,7 @@ setup_proot_base_packages() {
             local -a _pkgs=("${PKGS_PROOT_ARCH_BASE[@]}" "${PKGS_PROOT_ARCH_DESKTOP[@]}")
             local _total=${#_pkgs[@]} _i=0
             for p in "${_pkgs[@]}"; do
-                ((_i++))
+                ((++_i))
                 if proot_pkg_is_installed "$p"; then
                     ui_info "  (${_i}/${_total}) ${p} — 이미 설치됨"
                 else
@@ -104,7 +104,7 @@ setup_proot_korean() {
         ubuntu)
             local _total=${#PKGS_PROOT_UBUNTU_KOREAN[@]} _i=0
             for p in "${PKGS_PROOT_UBUNTU_KOREAN[@]}"; do
-                ((_i++))
+                ((++_i))
                 if proot_pkg_is_installed "$p"; then
                     ui_info "  (${_i}/${_total}) ${p} — 이미 설치됨"
                 else
@@ -119,7 +119,7 @@ setup_proot_korean() {
         archlinux)
             local _total=${#PKGS_PROOT_ARCH_KOREAN[@]} _i=0
             for p in "${PKGS_PROOT_ARCH_KOREAN[@]}"; do
-                ((_i++))
+                ((++_i))
                 if proot_pkg_is_installed "$p"; then
                     ui_info "  (${_i}/${_total}) ${p} — 이미 설치됨"
                 else
@@ -450,7 +450,7 @@ _setup_arch_nimf_or_fcitx5() {
         ui_warn "nimf AUR 빌드 실패 → fcitx5로 폴백"
         local _total=${#PKGS_PROOT_ARCH_KOREAN_FCITX5[@]} _i=0
         for p in "${PKGS_PROOT_ARCH_KOREAN_FCITX5[@]}"; do
-            ((_i++))
+            ((++_i))
             if proot_pkg_is_installed "$p"; then
                 ui_info "  (${_i}/${_total}) ${p} — 이미 설치됨"
             else

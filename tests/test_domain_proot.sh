@@ -1014,4 +1014,63 @@ _test_write_arch_im_env_fcitx5() {
 }
 it "use_nimf=false 시 fcitx5 환경변수를 쓴다" _test_write_arch_im_env_fcitx5
 
+# =============================================================================
+# 회귀: set -e + ((_i++)) 폭탄 — proot_env.sh의 카운터 루프 5곳
+# -----------------------------------------------------------------------------
+# Stage 4 실제 설치(--proot-only --distro ubuntu)에서 setup_proot_base_packages가
+# `((_i++))` 첫 호출 시 0 반환 → set -e 트립 → 패키지 1개도 못 깐 채 종료.
+# `((++_i))` 로 변경 (pre-increment, 항상 새 값 반환).
+# =============================================================================
+
+describe "proot_env — set -e safe counter (regression)"
+
+_test_setup_proot_base_packages_ubuntu_completes_under_set_e() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    _make_proot_rootfs "$sb" "ubuntu" "testuser"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS=""
+
+    # || true 없이 호출 — set -e 하에서 모든 패키지를 끝까지 시도해야 함
+    setup_proot_base_packages
+
+    local install_count=0
+    for call in "${MOCK_CALLS[@]:-}"; do
+        [[ "$call" == "proot_pkg_install "* ]] && install_count=$((install_count + 1))
+    done
+    local expected=$(( ${#PKGS_PROOT_UBUNTU_BASE[@]} + ${#PKGS_PROOT_UBUNTU_DESKTOP[@]} ))
+    assert_eq "$expected" "$install_count" "Ubuntu base+desktop 패키지 모두 시도되어야 함"
+    cleanup_sandbox "$sb"
+}
+it "setup_proot_base_packages(ubuntu)가 set -e 하에서 끝까지 실행된다" _test_setup_proot_base_packages_ubuntu_completes_under_set_e
+
+_test_setup_proot_base_packages_arch_completes_under_set_e() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "archlinux" "testuser"
+    _make_proot_rootfs "$sb" "archlinux" "testuser"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS=""
+
+    setup_proot_base_packages
+
+    local install_count=0
+    for call in "${MOCK_CALLS[@]:-}"; do
+        [[ "$call" == "proot_pkg_install "* ]] && install_count=$((install_count + 1))
+    done
+    local expected=$(( ${#PKGS_PROOT_ARCH_BASE[@]} + ${#PKGS_PROOT_ARCH_DESKTOP[@]} ))
+    assert_eq "$expected" "$install_count" "Arch base+desktop 패키지 모두 시도되어야 함"
+    cleanup_sandbox "$sb"
+}
+it "setup_proot_base_packages(arch)가 set -e 하에서 끝까지 실행된다" _test_setup_proot_base_packages_arch_completes_under_set_e
+
+_test_no_post_increment_in_proot_env() {
+    # 정적 검사: 향후 ((_i++)) 패턴이 재도입되지 않도록 grep으로 가드
+    if grep -E '\(\(_*i\+\+\)\)' "${DOMAIN_DIR}/proot_env.sh" >/dev/null; then
+        echo "[ASSERT] proot_env.sh에 금지된 '((i++))' 패턴 재도입됨 — '((++i))' 사용 필요" >&2
+        grep -nE '\(\(_*i\+\+\)\)' "${DOMAIN_DIR}/proot_env.sh" >&2
+        return 1
+    fi
+}
+it "proot_env.sh에 ((i++)) post-increment 패턴이 없다" _test_no_post_increment_in_proot_env
+
 print_results
