@@ -728,19 +728,45 @@ _test_base_pkgs_skips_installed() {
     local sb; sb=$(make_sandbox)
     _load_domain "$sb"
     reset_mock_calls
-    MOCK_INSTALLED_PKGS="${PKGS_TERMUX_BASE[*]} ${PKGS_TERMUX_CLI[*]} ${PKGS_TERMUX_PROOT[*]} dbus"
+    # XFCE도 이미 설치된 상태 (Stage 6→Stage 7 같은 idempotent 재실행 시뮬레이션)
+    MOCK_INSTALLED_PKGS="${PKGS_TERMUX_BASE[*]} ${PKGS_TERMUX_CLI[*]} ${PKGS_TERMUX_PROOT[*]} dbus xfce4-session"
 
     _install_base_packages 2>/dev/null || true
-    # dbus remove는 항상 호출되지만 다른 pkg_install은 없어야 함
+    # XFCE 존재 시 dbus 제거 안 함 → cascade 제거 차단 → 모든 pkg가 skip
     local install_count=0
     for call in "${MOCK_CALLS[@]:-}"; do
         [[ "$call" == pkg_install* ]] && ((install_count++))
     done
-    # dbus는 remove 후 재설치되므로 dbus 1건만 허용
-    [ "$install_count" -le 1 ]
+    [ "$install_count" -eq 0 ]
     cleanup_sandbox "$sb"
 }
-it "멱등성 — 이미 설치된 패키지는 건너뛴다" _test_base_pkgs_skips_installed
+it "멱등성 — 이미 설치된 패키지는 건너뛴다 (XFCE 있으면 dbus도 보존)" _test_base_pkgs_skips_installed
+
+_test_base_pkgs_dbus_removed_on_clean_install() {
+    # 클린 설치 (XFCE 없음): dbus 리셋 의도대로 작동
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS="dbus"   # dbus만 잔존 (xfce4-session 없음)
+
+    _install_base_packages 2>/dev/null || true
+    assert_was_called "pkg_remove dbus"
+    cleanup_sandbox "$sb"
+}
+it "클린 설치 (XFCE 없음) — dbus 리셋을 위해 제거된다" _test_base_pkgs_dbus_removed_on_clean_install
+
+_test_base_pkgs_dbus_preserved_when_xfce_installed() {
+    # 회귀: Stage 7 같은 멱등 재실행에서 dbus 제거 → 64개 cascade 제거 방지
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS="dbus xfce4-session fcitx5"
+
+    _install_base_packages 2>/dev/null || true
+    assert_not_called "pkg_remove dbus"
+    cleanup_sandbox "$sb"
+}
+it "XFCE 설치된 idempotent 재실행에서는 dbus를 보존한다 (cascade 제거 차단)" _test_base_pkgs_dbus_preserved_when_xfce_installed
 
 # =============================================================================
 # setup_termux_gpu_dev — GPU 개발 도구 패키지 루프

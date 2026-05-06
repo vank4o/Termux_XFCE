@@ -195,12 +195,14 @@ _install_base_packages() {
         "${PKGS_TERMUX_PROOT[@]}"
     )
 
-    # dbus 매 실행 제거 (주석 "멱등성"은 오해 소지 있음 — 실제로는 매번 제거됨)
-    # 제거 → 아래 all_pkgs 루프에서 재설치되는 흐름
-    # 의도(추정): 설치 도중 남은 dbus 락/소켓 상태를 리셋하여 startXFCE의 dbus-launch와
-    #           proot-distro 내부 dbus-daemon 간 소켓 경합을 예방
-    # 실기기에서 검증된 동작이므로 순서 변경 금지 — 구조 개선 전엔 현 상태 유지
-    pkg_is_installed "dbus" && pkg_remove dbus
+    # dbus 리셋: dbus 락/소켓 상태 초기화로 startXFCE의 dbus-launch와
+    # proot-distro 내부 dbus-daemon 간 소켓 경합을 예방.
+    # 단, XFCE가 이미 설치된 idempotent 재실행에서는 cascade 제거를 피함
+    # — `pkg uninstall dbus` 는 dbus를 require하는 64개 (xfce4, fcitx5 전체) 까지 함께 제거.
+    # XFCE가 깔려 있다는 건 이전 설치가 성공했다는 뜻 → dbus 리셋 불필요.
+    if pkg_is_installed "dbus" && ! pkg_is_installed "xfce4-session"; then
+        pkg_remove dbus
+    fi
 
     local total=${#all_pkgs[@]} i=0
     for p in "${all_pkgs[@]}"; do
