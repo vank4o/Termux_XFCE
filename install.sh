@@ -120,6 +120,12 @@ source "$SCRIPT_DIR/domain/xfce_env.sh"
 source "$SCRIPT_DIR/domain/locale_ko.sh"
 source "$SCRIPT_DIR/domain/proot_env.sh"
 
+# 테스트 훅: 모든 source 이후, 실제 설치 전에 setup_* 함수를 스텁으로 교체할 수 있는 지점
+# (테스트 매트릭스가 dispatch 로직만 검증하고 실제 설치 수행은 안 하기 위함)
+if [ -n "${_INSTALL_HOOK:-}" ] && [ -f "${_INSTALL_HOOK}" ]; then
+    source "${_INSTALL_HOOK}"
+fi
+
 # -----------------------------------------------------------------------------
 # 8. 아키텍처 확인
 # -----------------------------------------------------------------------------

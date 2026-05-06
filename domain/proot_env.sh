@@ -310,7 +310,7 @@ setup_proot_alias() {
     local bashrc="$PREFIX/etc/bash.bashrc"
     grep -q "alias ${distro}=" "$bashrc" 2>/dev/null || echo "$_proot_alias" >> "$bashrc"
 
-    if command -v zsh &>/dev/null && [ -f "$HOME/.zshrc" ]; then
+    if [ -f "$HOME/.zshrc" ]; then
         grep -q "alias ${distro}=" "$HOME/.zshrc" 2>/dev/null || echo "$_proot_alias" >> "$HOME/.zshrc"
     fi
 }
