@@ -1015,6 +1015,50 @@ _test_write_arch_im_env_fcitx5() {
 it "use_nimf=false 시 fcitx5 환경변수를 쓴다" _test_write_arch_im_env_fcitx5
 
 # =============================================================================
+# _install_yay — proot_exec 명령 구조 검증
+# -----------------------------------------------------------------------------
+# yay-bin AUR clone + makepkg 흐름이 proot_exec에 전달되는지 검증.
+# 실제 빌드는 mock proot_exec로 차단.
+# =============================================================================
+
+describe "proot_env — _install_yay"
+
+_test_install_yay_invokes_proot_exec_with_makepkg() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "archlinux" "testuser"
+
+    # proot_exec 호출 인자를 파일로 기록 (서브셸 없이도 가능하지만 안전)
+    YAY_LOG=$(mktemp "${TMPDIR:-/data/data/com.termux/files/usr/tmp}/yay_log_XXXXXX")
+    proot_exec() { echo "$*" >> "$YAY_LOG"; return 0; }
+
+    _install_yay
+
+    # 인자에 yay-bin clone, makepkg, base-devel, idempotency check가 포함되어야 함
+    assert_file_contains "$YAY_LOG" "yay-bin"
+    assert_file_contains "$YAY_LOG" "makepkg -si --noconfirm"
+    assert_file_contains "$YAY_LOG" "git base-devel"
+    assert_file_contains "$YAY_LOG" "command -v yay"
+    rm -f "$YAY_LOG"
+    cleanup_sandbox "$sb"
+}
+it "yay-bin clone + makepkg + 멱등성 체크가 proot_exec에 전달된다" _test_install_yay_invokes_proot_exec_with_makepkg
+
+_test_install_yay_runs_in_subshell_via_bash_c() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "archlinux" "testuser"
+
+    YAY_FIRST_ARG=""
+    proot_exec() { YAY_FIRST_ARG="$1"; return 0; }
+
+    _install_yay
+
+    # proot_exec의 첫 인자는 'bash' 여야 함 (proot_exec bash -c "...")
+    assert_eq "bash" "$YAY_FIRST_ARG"
+    cleanup_sandbox "$sb"
+}
+it "proot_exec bash -c 형태로 호출된다" _test_install_yay_runs_in_subshell_via_bash_c
+
+# =============================================================================
 # 회귀: set -e + ((_i++)) 폭탄 — proot_env.sh의 카운터 루프 5곳
 # -----------------------------------------------------------------------------
 # Stage 4 실제 설치(--proot-only --distro ubuntu)에서 setup_proot_base_packages가
