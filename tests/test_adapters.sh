@@ -54,8 +54,9 @@ it "proot_pkg_install는 에러 메시지를 출력한다" _test_proot_pkg_insta
 
 _test_proot_pkg_is_installed_false() {
     source "${ADAPTER_DIR}/pkg_termux.sh"
-    proot_pkg_is_installed "nonexistent_pkg_xyz"
-    assert_nonzero $? "proot_pkg_is_installed는 항상 1(미설치)을 반환해야 한다"
+    local rc=0
+    proot_pkg_is_installed "nonexistent_pkg_xyz" || rc=$?
+    assert_nonzero "$rc" "proot_pkg_is_installed는 항상 1(미설치)을 반환해야 한다"
 }
 it "proot_pkg_is_installed는 항상 미설치(1)를 반환한다" _test_proot_pkg_is_installed_false
 
@@ -112,6 +113,30 @@ _test_ui_input_default() {
     assert_output_contains "$out" "기본값"
 }
 it "ui_input은 빈 입력 시 기본값을 반환한다" _test_ui_input_default
+
+_test_ui_select_menu_redirected_to_stderr_static() {
+    # 회귀: ui_select 메뉴 출력이 stdout으로 가면 $()로 캡처될 때 반환값과
+    # 섞여서 PROOT_DISTRO 등이 통째로 깨진다. 메뉴 그룹은 stderr로 가야 한다.
+    # 과거 버그: 사용자가 install.sh 대화형 실행 시 distro 선택 후
+    #   "[ERROR] 지원하지 않는 distro: === proot-distro 선택 ==="로 실패
+    # /dev/tty 의존 때문에 dynamic 테스트가 어려워 정적 검증으로 잠금
+    local file="${ADAPTER_DIR}/ui_terminal.sh"
+    # ui_select 함수 본문 추출 (sed로 함수 시작~끝 블록)
+    local body
+    body=$(awk '/^ui_select\(\)/,/^\}/' "$file")
+    # 메뉴 그룹 redirect '} >&2'가 있어야 한다
+    if ! echo "$body" | grep -q '} >&2'; then
+        echo "  ui_select에 '} >&2' 메뉴 그룹 redirect가 없다"
+        return 1
+    fi
+    # 검증 실패 메시지도 stderr로 가야 한다
+    if ! echo "$body" | grep -q '올바른 번호를 입력하세요.*>&2'; then
+        echo "  검증 실패 echo가 stderr로 redirect되지 않음"
+        return 1
+    fi
+}
+it "ui_select 메뉴 출력은 stderr로 redirect된다 (회귀)" \
+   _test_ui_select_menu_redirected_to_stderr_static
 
 # =============================================================================
 # pkg_termux.sh — proot 신규 stub 에러 반환 검증

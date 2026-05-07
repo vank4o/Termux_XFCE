@@ -158,6 +158,8 @@ _test_force_gettext_warns_if_src_missing() {
     reset_ui_output
 
     # force_gettext.c 없음 + .so도 없음
+    # SCRIPT_DIR을 샌드박스로 덮어 assets/force_gettext.c가 없는 상태로 만든다
+    export SCRIPT_DIR="$sb"
     rm -f "${PREFIX}/lib/force_gettext.so"
 
     _build_force_gettext 2>/dev/null || true

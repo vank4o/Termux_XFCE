@@ -22,7 +22,7 @@ setup_xfce_packages() {
     local -a _pkgs=("${PKGS_TERMUX_XFCE[@]}")
     local total=${#_pkgs[@]} i=0
     for p in "${_pkgs[@]}"; do
-        ((i++))
+        ((++i))
         if pkg_is_installed "$p"; then
             ui_info "  (${i}/${total}) ${p} — 이미 설치됨"
         else

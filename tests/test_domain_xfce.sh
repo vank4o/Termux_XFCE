@@ -630,4 +630,122 @@ EOF
 }
 it "멱등성 — actions가 없으면 변경하지 않는다" _test_remove_actions_plugin_idempotent
 
+# =============================================================================
+# 회귀: set -e + ((i++)) 폭탄 — || true 없이 끝까지 실행 검증
+# =============================================================================
+
+describe "xfce_env — set -e safe counter (regression)"
+
+_test_setup_xfce_packages_completes_under_set_e() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS=""
+
+    # || true 없이 호출 — i=0에서 시작하는 카운터 루프가 set -e로 죽지 않음을 보증
+    setup_xfce_packages
+
+    local install_count=0
+    for call in "${MOCK_CALLS[@]:-}"; do
+        [[ "$call" == pkg_install* ]] && install_count=$((install_count + 1))
+    done
+    [ "$install_count" -eq "${#PKGS_TERMUX_XFCE[@]}" ]
+    cleanup_sandbox "$sb"
+}
+it "setup_xfce_packages가 set -e 하에서 끝까지 실행된다" _test_setup_xfce_packages_completes_under_set_e
+
+# =============================================================================
+# setup_xfce_theme — 다운로드 실패 시에도 || true 로 계속 진행
+# =============================================================================
+
+describe "xfce_env — setup_xfce_theme (error tolerance)"
+
+_test_xfce_theme_calls_both_installers() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    THEME_CALLS=""
+    _install_whitesur_theme() { THEME_CALLS+="whitesur:"; return 0; }
+    _install_fluent_cursor()  { THEME_CALLS+="fluent:";  return 0; }
+
+    setup_xfce_theme
+
+    [[ "$THEME_CALLS" == *whitesur:* ]] && [[ "$THEME_CALLS" == *fluent:* ]]
+    cleanup_sandbox "$sb"
+}
+it "_install_whitesur_theme + _install_fluent_cursor 둘 다 호출" _test_xfce_theme_calls_both_installers
+
+_test_xfce_theme_continues_on_whitesur_failure() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    _install_whitesur_theme() { return 1; }
+    FLUENT_CALLED=0
+    _install_fluent_cursor()  { FLUENT_CALLED=1; return 0; }
+
+    # set -e 활성 환경에서도 || true 로 계속 진행되어야 함
+    set -e
+    setup_xfce_theme
+    set +e
+
+    [ "$FLUENT_CALLED" -eq 1 ]
+    cleanup_sandbox "$sb"
+}
+it "whitesur 실패해도 fluent 커서 설치 계속 (|| true)" _test_xfce_theme_continues_on_whitesur_failure
+
+_test_xfce_theme_continues_on_fluent_failure() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    _install_whitesur_theme() { return 0; }
+    _install_fluent_cursor()  { return 1; }
+
+    set -e
+    setup_xfce_theme
+    local rc=$?
+    set +e
+
+    [ "$rc" -eq 0 ]
+    cleanup_sandbox "$sb"
+}
+it "fluent 실패해도 setup_xfce_theme 자체는 0 반환" _test_xfce_theme_continues_on_fluent_failure
+
+# =============================================================================
+# setup_xfce_autostart — 마이그레이션 호출 순서
+# =============================================================================
+
+describe "xfce_env — setup_xfce_autostart (composition order)"
+
+_test_xfce_autostart_calls_in_order() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    AUTOSTART_LOG=$(mktemp "${TMPDIR:-/data/data/com.termux/files/usr/tmp}/autostart_log_XXXXXX")
+    : > "$AUTOSTART_LOG"
+    _setup_autostart_config()        { echo "config"   >> "$AUTOSTART_LOG"; }
+    _migrate_fix_x11_input()         { echo "x11"      >> "$AUTOSTART_LOG"; }
+    _migrate_flameshot_native()      { echo "flame"    >> "$AUTOSTART_LOG"; }
+    _migrate_terminal_font()         { echo "termfont" >> "$AUTOSTART_LOG"; }
+    _migrate_borderless_maximize()   { echo "border"   >> "$AUTOSTART_LOG"; }
+    _migrate_disable_compositing()   { echo "comp"     >> "$AUTOSTART_LOG"; }
+    _migrate_remove_actions_plugin() { echo "actions"  >> "$AUTOSTART_LOG"; }
+    _migrate_dbus_propagate_path()   { echo "dbus"     >> "$AUTOSTART_LOG"; }
+    _migrate_conky_exec_ampersand()  { echo "conky"    >> "$AUTOSTART_LOG"; }
+
+    setup_xfce_autostart
+
+    local expected="config
+x11
+flame
+termfont
+border
+comp
+actions
+dbus
+conky"
+    local actual; actual=$(cat "$AUTOSTART_LOG")
+    rm -f "$AUTOSTART_LOG"
+
+    assert_eq "$expected" "$actual" "마이그레이션 호출 순서가 소스 코드와 일치해야 함"
+    cleanup_sandbox "$sb"
+}
+it "_setup_autostart_config → 마이그레이션 8건 순서대로 호출" _test_xfce_autostart_calls_in_order
+
 print_results

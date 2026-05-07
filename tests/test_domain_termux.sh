@@ -17,6 +17,8 @@ _load_domain() {
     mock_ui_adapter
     mock_wget
     source "${DOMAIN_DIR}/packages.sh"
+    # script_builder는 순수 파일 생성기(외부 의존 없음) → 실제 어댑터 로드
+    source "${DOMAIN_DIR}/../adapters/output/script_builder_zenity.sh"
     source "${DOMAIN_DIR}/termux_env.sh"
 }
 
@@ -156,7 +158,7 @@ _test_startxfce_has_gpu_detection() {
 
     _setup_start_xfce
     assert_file_contains "${HOME}/.shortcuts/startXFCE" "GPU_MODEL"
-    assert_file_contains "${HOME}/.shortcuts/startXFCE" "MESA_DRIVER"
+    assert_file_contains "${HOME}/.shortcuts/startXFCE" "MESA_LOADER_DRIVER_OVERRIDE"
     assert_file_contains "${HOME}/.shortcuts/startXFCE" "kgsl"
     cleanup_sandbox "$sb"
 }
@@ -560,6 +562,58 @@ _test_append_to_rc_idempotent() {
 }
 it "멱등성 — 마커가 이미 있으면 중복 추가하지 않는다" _test_append_to_rc_idempotent
 
+_test_append_to_rc_returns_zero_when_file_absent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    local missing="${sb}/does_not_exist.rc"
+
+    # 존재하지 않는 파일 — silent return 0 (set -e 트립 안됨)
+    set -e
+    _append_to_rc "# m" "# m\nexport X=1" "$missing"
+    local rc=$?
+    set +e
+
+    assert_eq "0" "$rc"
+    [ ! -f "$missing" ]  # 파일이 새로 생성되어서도 안됨
+    cleanup_sandbox "$sb"
+}
+it "파일이 없으면 0 반환 + 새로 생성하지 않는다" _test_append_to_rc_returns_zero_when_file_absent
+
+# =============================================================================
+# _rc_targets — zsh 존재 여부에 따른 RC 파일 목록
+# =============================================================================
+
+describe "termux_env — _rc_targets"
+
+_test_rc_targets_returns_bashrc_only_when_no_zshrc() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    rm -f "$HOME/.zshrc"
+
+    local out; out=$(_rc_targets)
+    [[ "$out" == *"bash.bashrc"* ]]
+    [[ "$out" != *".zshrc"* ]]
+    cleanup_sandbox "$sb"
+}
+it ".zshrc가 없으면 bash.bashrc만 반환" _test_rc_targets_returns_bashrc_only_when_no_zshrc
+
+_test_rc_targets_includes_zshrc_when_zsh_present() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    touch "$HOME/.zshrc"
+    # zsh가 PATH에 있는 것처럼 mock
+    command() {
+        if [ "$1" = "-v" ] && [ "$2" = "zsh" ]; then return 0; fi
+        builtin command "$@"
+    }
+
+    local out; out=$(_rc_targets)
+    [[ "$out" == *"bash.bashrc"* ]]
+    [[ "$out" == *".zshrc"* ]]
+    cleanup_sandbox "$sb"
+}
+it "zsh + .zshrc 둘 다 있으면 양쪽 모두 반환" _test_rc_targets_includes_zshrc_when_zsh_present
+
 # =============================================================================
 # _setup_xdg_runtime — XDG_RUNTIME_DIR mode 700
 # =============================================================================
@@ -726,19 +780,45 @@ _test_base_pkgs_skips_installed() {
     local sb; sb=$(make_sandbox)
     _load_domain "$sb"
     reset_mock_calls
-    MOCK_INSTALLED_PKGS="${PKGS_TERMUX_BASE[*]} ${PKGS_TERMUX_CLI[*]} ${PKGS_TERMUX_PROOT[*]} dbus"
+    # XFCE도 이미 설치된 상태 (Stage 6→Stage 7 같은 idempotent 재실행 시뮬레이션)
+    MOCK_INSTALLED_PKGS="${PKGS_TERMUX_BASE[*]} ${PKGS_TERMUX_CLI[*]} ${PKGS_TERMUX_PROOT[*]} dbus xfce4-session"
 
     _install_base_packages 2>/dev/null || true
-    # dbus remove는 항상 호출되지만 다른 pkg_install은 없어야 함
+    # XFCE 존재 시 dbus 제거 안 함 → cascade 제거 차단 → 모든 pkg가 skip
     local install_count=0
     for call in "${MOCK_CALLS[@]:-}"; do
         [[ "$call" == pkg_install* ]] && ((install_count++))
     done
-    # dbus는 remove 후 재설치되므로 dbus 1건만 허용
-    [ "$install_count" -le 1 ]
+    [ "$install_count" -eq 0 ]
     cleanup_sandbox "$sb"
 }
-it "멱등성 — 이미 설치된 패키지는 건너뛴다" _test_base_pkgs_skips_installed
+it "멱등성 — 이미 설치된 패키지는 건너뛴다 (XFCE 있으면 dbus도 보존)" _test_base_pkgs_skips_installed
+
+_test_base_pkgs_dbus_removed_on_clean_install() {
+    # 클린 설치 (XFCE 없음): dbus 리셋 의도대로 작동
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS="dbus"   # dbus만 잔존 (xfce4-session 없음)
+
+    _install_base_packages 2>/dev/null || true
+    assert_was_called "pkg_remove dbus"
+    cleanup_sandbox "$sb"
+}
+it "클린 설치 (XFCE 없음) — dbus 리셋을 위해 제거된다" _test_base_pkgs_dbus_removed_on_clean_install
+
+_test_base_pkgs_dbus_preserved_when_xfce_installed() {
+    # 회귀: Stage 7 같은 멱등 재실행에서 dbus 제거 → 64개 cascade 제거 방지
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS="dbus xfce4-session fcitx5"
+
+    _install_base_packages 2>/dev/null || true
+    assert_not_called "pkg_remove dbus"
+    cleanup_sandbox "$sb"
+}
+it "XFCE 설치된 idempotent 재실행에서는 dbus를 보존한다 (cascade 제거 차단)" _test_base_pkgs_dbus_preserved_when_xfce_installed
 
 # =============================================================================
 # setup_termux_gpu_dev — GPU 개발 도구 패키지 루프
@@ -792,5 +872,311 @@ _test_shortcuts_creates_all() {
     cleanup_sandbox "$sb"
 }
 it "모든 유틸리티 스크립트를 생성한다" _test_shortcuts_creates_all
+
+# =============================================================================
+# 회귀: set -e + ((i++)) 폭탄 (i=0 시작 카운터)
+# i++는 *증가 전* 값을 종료코드로 반환하므로 i=0이면 exit 1 → set -e가 첫
+# 반복에서 스크립트를 즉시 죽인다. 기존 테스트들은 모두 `|| true`로 가려져
+# 있어 이 버그를 잡지 못했음. 새 테스트는 `|| true` 없이 호출하여 함수가
+# 끝까지 실행되는지를 직접 검증한다.
+# =============================================================================
+
+describe "termux_env — set -e safe counter (regression)"
+
+_test_install_base_packages_completes_under_set_e() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS=""
+
+    # || true 없이 직접 호출 — set -e 하에서 첫 반복부터 끝까지 가야 함
+    _install_base_packages
+
+    # 모든 패키지에 대해 pkg_install이 호출되었는지 (루프가 끝까지 돌았다는 증거)
+    local total=$((${#PKGS_TERMUX_BASE[@]} + ${#PKGS_TERMUX_CLI[@]} + ${#PKGS_TERMUX_PROOT[@]}))
+    local install_count=0
+    for call in "${MOCK_CALLS[@]:-}"; do
+        [[ "$call" == pkg_install* ]] && install_count=$((install_count + 1))
+    done
+    # dbus 재설치(remove → install) 1건 포함해 최소 total건은 호출되어야 함
+    [ "$install_count" -ge "$total" ]
+    cleanup_sandbox "$sb"
+}
+it "_install_base_packages가 set -e 하에서 끝까지 실행된다" _test_install_base_packages_completes_under_set_e
+
+_test_setup_termux_gpu_completes_under_set_e() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS=""
+
+    setup_termux_gpu
+
+    local install_count=0
+    for call in "${MOCK_CALLS[@]:-}"; do
+        [[ "$call" == pkg_install* ]] && install_count=$((install_count + 1))
+    done
+    [ "$install_count" -eq "${#PKGS_TERMUX_GPU[@]}" ]
+    cleanup_sandbox "$sb"
+}
+it "setup_termux_gpu가 set -e 하에서 끝까지 실행된다" _test_setup_termux_gpu_completes_under_set_e
+
+_test_setup_termux_korean_completes_under_set_e() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS=""
+
+    setup_termux_korean
+
+    local install_count=0
+    for call in "${MOCK_CALLS[@]:-}"; do
+        [[ "$call" == pkg_install* ]] && install_count=$((install_count + 1))
+    done
+    # tur-repo + 한글 패키지들
+    [ "$install_count" -ge "${#PKGS_TERMUX_KOREAN[@]}" ]
+    cleanup_sandbox "$sb"
+}
+it "setup_termux_korean이 set -e 하에서 끝까지 실행된다" _test_setup_termux_korean_completes_under_set_e
+
+# =============================================================================
+# setup_termux_x11_apk — 아키텍처 분기 + 멱등성 + 폴백
+# =============================================================================
+
+describe "termux_env — setup_termux_x11_apk"
+
+# uname -m 결과를 지정값으로 고정한 채 함수 실행
+# 주의: setup_termux_x11_apk가 `local arch`를 사용하므로 이름 충돌을 피해
+# _MOCK_ARCH 같은 비충돌 이름을 사용해야 함 (bash dynamic scoping)
+_run_with_arch() {
+    local _MOCK_ARCH="$1"; shift
+    uname() {
+        if [ "$1" = "-m" ]; then echo "$_MOCK_ARCH"; else command uname "$@"; fi
+    }
+    "$@"
+}
+
+_test_x11_apk_aarch64_path() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "$HOME/storage/downloads"
+    termux-open() { _record_call "termux-open $*"; }
+    reset_mock_calls
+
+    _run_with_arch "aarch64" setup_termux_x11_apk
+
+    assert_was_called "wget"
+    assert_was_called "app-arm64-v8a-debug.apk"
+    cleanup_sandbox "$sb"
+}
+it "aarch64는 arm64-v8a APK를 다운로드한다" _test_x11_apk_aarch64_path
+
+_test_x11_apk_x86_64_path() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "$HOME/storage/downloads"
+    termux-open() { :; }
+    reset_mock_calls
+
+    _run_with_arch "x86_64" setup_termux_x11_apk
+
+    assert_was_called "app-x86_64-debug.apk"
+    cleanup_sandbox "$sb"
+}
+it "x86_64는 x86_64 APK를 다운로드한다" _test_x11_apk_x86_64_path
+
+_test_x11_apk_unsupported_arch_warns_and_returns() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "$HOME/storage/downloads"
+    termux-open() { _record_call "termux-open $*"; }
+    reset_mock_calls
+
+    _run_with_arch "armv7l" setup_termux_x11_apk
+
+    # wget/termux-open 둘 다 호출되지 않아야 함
+    assert_not_called "wget"
+    assert_not_called "termux-open"
+    cleanup_sandbox "$sb"
+}
+it "지원되지 않는 아키텍처는 wget 없이 경고 후 종료" _test_x11_apk_unsupported_arch_warns_and_returns
+
+_test_x11_apk_idempotent_when_present() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "$HOME/storage/downloads"
+    # 이미 다운로드된 상태
+    touch "$HOME/storage/downloads/app-arm64-v8a-debug.apk"
+    termux-open() { _record_call "termux-open $*"; }
+    reset_mock_calls
+
+    _run_with_arch "aarch64" setup_termux_x11_apk
+
+    assert_not_called "wget"
+    assert_was_called "termux-open"
+    cleanup_sandbox "$sb"
+}
+it "APK가 이미 있으면 wget 건너뛰고 termux-open만 호출" _test_x11_apk_idempotent_when_present
+
+_test_x11_apk_falls_back_to_home_when_no_storage() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    # storage/downloads 없음 → HOME으로 폴백
+    [ ! -d "$HOME/storage/downloads" ]
+    termux-open() { _record_call "termux-open $*"; }
+    reset_mock_calls
+
+    _run_with_arch "aarch64" setup_termux_x11_apk
+
+    # HOME에 APK가 생성되어야 함 (mock_wget이 -O 경로에 touch)
+    assert_file_exists "$HOME/app-arm64-v8a-debug.apk"
+    cleanup_sandbox "$sb"
+}
+it "storage/downloads 없을 때 HOME으로 폴백" _test_x11_apk_falls_back_to_home_when_no_storage
+
+# =============================================================================
+# setup_termux_widget — 사전 조건 + 디렉터리 생성
+# =============================================================================
+
+describe "termux_env — setup_termux_widget"
+
+_test_widget_creates_shortcuts_dir() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "$HOME/storage/downloads"
+    rm -rf "$HOME/.shortcuts"
+    termux-open() { :; }
+
+    setup_termux_widget
+
+    assert_dir_exists "$HOME/.shortcuts"
+    cleanup_sandbox "$sb"
+}
+it ".shortcuts 디렉터리가 없으면 생성한다" _test_widget_creates_shortcuts_dir
+
+_test_widget_warns_when_startxfce_missing() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "$HOME/storage/downloads" "$HOME/.shortcuts"
+    # startXFCE 단축키 부재
+    termux-open() { :; }
+    reset_ui_output
+
+    setup_termux_widget
+
+    assert_ui_contains "startXFCE 단축키가 없습니다"
+    cleanup_sandbox "$sb"
+}
+it "startXFCE 단축키 누락 시 경고 출력" _test_widget_warns_when_startxfce_missing
+
+_test_widget_no_warn_when_startxfce_present() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "$HOME/storage/downloads" "$HOME/.shortcuts"
+    touch "$HOME/.shortcuts/startXFCE"
+    termux-open() { :; }
+    reset_ui_output
+
+    setup_termux_widget
+
+    # startXFCE 경고가 없어야 함
+    for msg in "${UI_OUTPUT[@]:-}"; do
+        if [[ "$msg" == *"startXFCE 단축키가 없습니다"* ]]; then
+            echo "[ASSERT] unexpected startXFCE warning: $msg" >&2
+            return 1
+        fi
+    done
+    cleanup_sandbox "$sb"
+}
+it "startXFCE 단축키 존재 시 경고 안나옴" _test_widget_no_warn_when_startxfce_present
+
+# =============================================================================
+# _setup_termux_repos — 3개 repo + pkg_update
+# =============================================================================
+
+describe "termux_env — _setup_termux_repos"
+
+_test_termux_repos_installs_three_when_absent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    MOCK_INSTALLED_PKGS=""
+    reset_mock_calls
+
+    _setup_termux_repos
+
+    assert_was_called "pkg_install x11-repo"
+    assert_was_called "pkg_install tur-repo"
+    assert_was_called "pkg_install root-repo"
+    assert_was_called "pkg_update"
+    cleanup_sandbox "$sb"
+}
+it "x11/tur/root-repo 미설치 시 모두 설치 + pkg_update 호출" _test_termux_repos_installs_three_when_absent
+
+_test_termux_repos_skips_already_installed() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    MOCK_INSTALLED_PKGS="x11-repo tur-repo root-repo"
+    reset_mock_calls
+
+    _setup_termux_repos
+
+    assert_not_called "pkg_install x11-repo"
+    assert_not_called "pkg_install tur-repo"
+    assert_not_called "pkg_install root-repo"
+    # pkg_update는 항상 호출
+    assert_was_called "pkg_update"
+    cleanup_sandbox "$sb"
+}
+it "이미 설치된 repo는 건너뛰지만 pkg_update는 호출" _test_termux_repos_skips_already_installed
+
+# =============================================================================
+# _cleanup_duplicate_fcitx_autostart — 시스템+사용자 동시 존재 시만 제거
+# =============================================================================
+
+describe "termux_env — _cleanup_duplicate_fcitx_autostart"
+
+_test_cleanup_removes_user_when_both_present() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${PREFIX}/etc/xdg/autostart"
+    touch "${PREFIX}/etc/xdg/autostart/org.fcitx.Fcitx5.desktop"
+    touch "${HOME}/.config/autostart/fcitx5.desktop"
+
+    _cleanup_duplicate_fcitx_autostart
+
+    [ ! -f "${HOME}/.config/autostart/fcitx5.desktop" ]
+    assert_file_exists "${PREFIX}/etc/xdg/autostart/org.fcitx.Fcitx5.desktop"
+    cleanup_sandbox "$sb"
+}
+it "시스템+사용자 둘 다 있으면 사용자 autostart 제거" _test_cleanup_removes_user_when_both_present
+
+_test_cleanup_keeps_user_when_no_system() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    # 시스템 autostart 없음 — 사용자 것만 존재 (폴백 상황)
+    touch "${HOME}/.config/autostart/fcitx5.desktop"
+
+    _cleanup_duplicate_fcitx_autostart
+
+    assert_file_exists "${HOME}/.config/autostart/fcitx5.desktop"
+    cleanup_sandbox "$sb"
+}
+it "시스템 autostart 부재 시 사용자 autostart 유지 (폴백)" _test_cleanup_keeps_user_when_no_system
+
+_test_cleanup_noop_when_only_system() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "${PREFIX}/etc/xdg/autostart"
+    touch "${PREFIX}/etc/xdg/autostart/org.fcitx.Fcitx5.desktop"
+    rm -f "${HOME}/.config/autostart/fcitx5.desktop"
+
+    # 사용자 autostart 없음 — 변경 없어야 함
+    _cleanup_duplicate_fcitx_autostart
+
+    assert_file_exists "${PREFIX}/etc/xdg/autostart/org.fcitx.Fcitx5.desktop"
+    [ ! -f "${HOME}/.config/autostart/fcitx5.desktop" ]
+    cleanup_sandbox "$sb"
+}
+it "시스템만 있고 사용자 없음 — no-op" _test_cleanup_noop_when_only_system
 
 print_results

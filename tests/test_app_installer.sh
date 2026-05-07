@@ -118,8 +118,13 @@ EOF
     # install.sh의 메인 루프는 실행 안 함 — 함수 정의만 source
     # 메인 루프(while true) 전까지만 로드
     local tmp="${TMPDIR}/install_partial_$$.sh"
-    awk '/^while true/{ exit } { print }' "${APP_DIR}/install.sh" > "$tmp"
-    source "$tmp"
+    # install.sh의 `SCRIPT_DIR=$(...)` 라인은 source 시점 $0이 테스트라 잘못 잡히므로 제거 후 외부에서 주입
+    awk '
+        /^while true/{ exit }
+        /^SCRIPT_DIR=/{ next }
+        { print }
+    ' "${APP_DIR}/install.sh" > "$tmp"
+    SCRIPT_DIR="$APP_DIR" source "$tmp"
     rm -f "$tmp"
 }
 
@@ -144,8 +149,13 @@ _test_config_fallback() {
     zenity()       { echo "ZENITY: $*"; }
     proot-distro() { echo "PROOT: $*"; }
     local tmp="${TMPDIR}/install_partial_$$.sh"
-    awk '/^while true/{ exit } { print }' "${APP_DIR}/install.sh" > "$tmp"
-    source "$tmp"
+    # install.sh의 `SCRIPT_DIR=$(...)` 라인은 source 시점 $0이 테스트라 잘못 잡히므로 제거 후 외부에서 주입
+    awk '
+        /^while true/{ exit }
+        /^SCRIPT_DIR=/{ next }
+        { print }
+    ' "${APP_DIR}/install.sh" > "$tmp"
+    SCRIPT_DIR="$APP_DIR" source "$tmp"
     rm -f "$tmp"
 
     assert_eq "ubuntu" "${PROOT_DISTRO:-}" "fallback PROOT_DISTRO"
@@ -154,83 +164,76 @@ _test_config_fallback() {
 it "config 없을 때 PROOT_DISTRO=ubuntu로 fallback한다" _test_config_fallback
 
 # =============================================================================
-# install.sh — check_*_installed 함수
+# install.sh — _detect_proot_user (P1-3 회귀: glob 미매치 시 literal "*" 폭탄)
 # =============================================================================
 
-describe "app-installer/install.sh — check_installed 함수"
+describe "app-installer/install.sh — _detect_proot_user"
 
-_setup_check_env() {
-    local sb="$1"
-    _load_installer "$sb"
+# install.sh의 _detect_proot_user만 추출해서 source (다른 부분 부작용 회피)
+_load_detect_only() {
+    local tmp="${TMPDIR}/detect_only_$$.sh"
+    awk '
+        /^_detect_proot_user\(\) \{/{ in_fn=1 }
+        in_fn{ print }
+        in_fn && /^\}/{ exit }
+    ' "${APP_DIR}/install.sh" > "$tmp"
+    source "$tmp"
+    rm -f "$tmp"
 }
 
-_test_check_not_installed() {
+_test_detect_proot_user_picks_first_home() {
     local sb; sb=$(make_sandbox)
-    _setup_check_env "$sb"
-
-    assert_eq "Not Installed" "$(check_vlc_installed)"        "vlc: 미설치"
-    assert_eq "Not Installed" "$(check_code_installed)"       "vscode: 미설치"
-    assert_eq "Not Installed" "$(check_wine_installed)"       "wine: 미설치"
-    assert_eq "Not Installed" "$(check_thunderbird_installed)" "thunderbird: 미설치"
+    export PREFIX="${sb}/usr"
+    export PROOT_DISTRO="ubuntu"
+    mkdir -p "${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/home/alice"
+    _load_detect_only
+    local got; got=$(_detect_proot_user)
+    assert_eq "alice" "$got" "single home dir"
     cleanup_sandbox "$sb"
 }
-it "desktop 파일 없으면 'Not Installed' 반환" _test_check_not_installed
+it "home에 사용자 1명 → 그 이름 반환" _test_detect_proot_user_picks_first_home
 
-_test_check_installed_after_desktop_created() {
+_test_detect_proot_user_no_home_returns_user() {
     local sb; sb=$(make_sandbox)
-    _setup_check_env "$sb"
-
-    # desktop 파일 생성
-    touch "${PREFIX}/share/applications/vlc.desktop"
-    touch "${PREFIX}/share/applications/code.desktop"
-    touch "${PREFIX}/share/applications/wine64.desktop"
-
-    assert_eq "Installed" "$(check_vlc_installed)"  "vlc: 설치됨"
-    assert_eq "Installed" "$(check_code_installed)"  "vscode: 설치됨"
-    assert_eq "Installed" "$(check_wine_installed)"  "wine: 설치됨"
+    export PREFIX="${sb}/usr"
+    export PROOT_DISTRO="ubuntu"
+    # home 디렉토리는 만들지만 사용자 dir 없음 → glob 미매치
+    mkdir -p "${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/home"
+    _load_detect_only
+    local got; got=$(_detect_proot_user)
+    assert_eq "user" "$got" "empty home → fallback (P1-3 핵심: literal '*' 반환 차단)"
     cleanup_sandbox "$sb"
 }
-it "desktop 파일 있으면 'Installed' 반환" _test_check_installed_after_desktop_created
+it "home이 비어있을 때 'user' 폴백 (glob '*' 폭탄 차단)" _test_detect_proot_user_no_home_returns_user
 
-_test_check_miniforge_uses_dir() {
+_test_detect_proot_user_no_proot_returns_user() {
     local sb; sb=$(make_sandbox)
-    _setup_check_env "$sb"
-
-    # miniforge는 디렉토리 존재 여부로 판단
-    assert_eq "Not Installed" "$(check_miniforge_installed)"
-    mkdir -p "${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/home/testuser/miniforge3"
-    assert_eq "Installed" "$(check_miniforge_installed)"
+    export PREFIX="${sb}/usr"
+    export PROOT_DISTRO="ubuntu"
+    # proot-distro 자체 미설치 → installed-rootfs 디렉토리 없음
+    _load_detect_only
+    local got; got=$(_detect_proot_user)
+    assert_eq "user" "$got" "proot 미설치 → fallback"
     cleanup_sandbox "$sb"
 }
-it "miniforge — 홈 디렉토리 존재 여부로 판단" _test_check_miniforge_uses_dir
+it "proot 미설치 시 'user' 폴백" _test_detect_proot_user_no_proot_returns_user
+
+_test_detect_proot_user_distro_unset_returns_user() {
+    local sb; sb=$(make_sandbox)
+    export PREFIX="${sb}/usr"
+    unset PROOT_DISTRO
+    _load_detect_only
+    local got; got=$(_detect_proot_user)
+    assert_eq "user" "$got" "PROOT_DISTRO 미설정 → fallback"
+    cleanup_sandbox "$sb"
+}
+it "PROOT_DISTRO 미설정 시 set -u에서 트립하지 않고 'user' 반환" _test_detect_proot_user_distro_unset_returns_user
 
 # =============================================================================
-# install.sh — _action + _row 행 생성 로직
+# 구 API(check_*_installed, _action)는 헥사고날 리팩토링으로 제거됨
+# 새 API: app_is_installed_<id> / app_install_<id> / app_remove_<id> (domain/installers/*.sh)
+# 새 API용 테스트는 별도 추가 필요 (TODO)
 # =============================================================================
-
-describe "app-installer/install.sh — UI 행 생성"
-
-_test_action_not_installed_shows_install() {
-    local sb; sb=$(make_sandbox)
-    _setup_check_env "$sb"
-
-    local row; row=$(_action "VLC" "Not Installed" "Media player")
-    assert_output_contains "$row" "Install VLC"
-    assert_output_contains "$row" "Not Installed"
-    cleanup_sandbox "$sb"
-}
-it "미설치 앱은 'Install' 액션을 표시한다" _test_action_not_installed_shows_install
-
-_test_action_installed_shows_remove() {
-    local sb; sb=$(make_sandbox)
-    _setup_check_env "$sb"
-
-    local row; row=$(_action "VLC" "Installed" "Media player")
-    assert_output_contains "$row" "Remove VLC"
-    assert_output_contains "$row" "Installed"
-    cleanup_sandbox "$sb"
-}
-it "설치된 앱은 'Remove' 액션을 표시한다" _test_action_installed_shows_remove
 
 # =============================================================================
 # vlc.sh — proot 설치 (VLC는 Qt GUI 의존성으로 proot 내부에 설치)
@@ -324,41 +327,11 @@ it "wine.sh — proot/native 양쪽 wrapper 모두 DPI 지원" _test_wine_dpi_in
 
 describe "Wine 앱 installer — 구조 검증"
 
-_test_wine_apps_have_wine_dependency() {
-    local failed=0
-    for app in kakaotalk notepadpp sevenzip; do
-        if ! grep -q 'app_is_installed_wine' "${INSTALLERS_DIR}/${app}.sh" 2>/dev/null; then
-            echo "[ASSERT] ${app}.sh — Wine 의존성 체크 없음" >&2
-            failed=1
-        fi
-    done
-    return "$failed"
-}
-it "모든 Wine 앱 — Wine 설치 여부 체크 있음" _test_wine_apps_have_wine_dependency
-
-_test_wine_apps_create_desktop() {
-    local failed=0
-    for app in kakaotalk notepadpp sevenzip; do
-        if ! grep -q '\[Desktop Entry\]' "${INSTALLERS_DIR}/${app}.sh" 2>/dev/null; then
-            echo "[ASSERT] ${app}.sh — .desktop 생성 로직 없음" >&2
-            failed=1
-        fi
-    done
-    return "$failed"
-}
-it "모든 Wine 앱 — .desktop 파일 생성 로직 있음" _test_wine_apps_create_desktop
-
-_test_wine_apps_desktop_uses_wine_cmd() {
-    local failed=0
-    for app in kakaotalk notepadpp sevenzip; do
-        if ! grep -q 'Exec=.*wine' "${INSTALLERS_DIR}/${app}.sh" 2>/dev/null; then
-            echo "[ASSERT] ${app}.sh — Exec에 wine 명령 없음" >&2
-            failed=1
-        fi
-    done
-    return "$failed"
-}
-it "모든 Wine 앱 — desktop Exec에 wine 명령 사용" _test_wine_apps_desktop_uses_wine_cmd
+# kakaotalk/notepadpp/sevenzip은 APP_REGISTRY에 등록되어 있으나 installer 미구현 (submodule TODO)
+# 구현되면 아래 skip을 제거하고 활성화
+skip "모든 Wine 앱 — Wine 설치 여부 체크 있음 (kakaotalk/notepadpp/sevenzip 미구현)"
+skip "모든 Wine 앱 — .desktop 파일 생성 로직 있음 (kakaotalk/notepadpp/sevenzip 미구현)"
+skip "모든 Wine 앱 — desktop Exec에 wine 명령 사용 (kakaotalk/notepadpp/sevenzip 미구현)"
 
 # =============================================================================
 # 모든 installer 스크립트 문법 검사

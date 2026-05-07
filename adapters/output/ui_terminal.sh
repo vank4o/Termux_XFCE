@@ -30,16 +30,17 @@ ui_select() {
     shift 2
     local options=("$@")
 
-    echo -e "${_C_CYAN}=== ${title} ===${_C_NC}"
-    echo "$prompt"
-    echo ""
-
-    local i=1
-    for opt in "${options[@]}"; do
-        echo "  $i) $opt"
-        ((i++))
-    done
-    echo ""
+    {
+        echo -e "${_C_CYAN}=== ${title} ===${_C_NC}"
+        echo "$prompt"
+        echo ""
+        local i=1
+        for opt in "${options[@]}"; do
+            echo "  $i) $opt"
+            i=$((i+1))
+        done
+        echo ""
+    } >&2
 
     local choice
     while true; do
@@ -50,7 +51,7 @@ ui_select() {
             echo "${options[$((choice-1))]}"
             return 0
         fi
-        echo "올바른 번호를 입력하세요."
+        echo "올바른 번호를 입력하세요." >&2
     done
 }
 

@@ -9,7 +9,7 @@ source "${SCRIPT_DIR}/framework.sh"
 
 ADAPTER_DIR="${SCRIPT_DIR}/../adapters/output"
 
-# pkg_manager 포트가 요구하는 함수 목록
+# pkg_manager 포트가 요구하는 함수 목록 — ports/pkg_manager.sh와 1:1 일치 필요
 PKG_MANAGER_CONTRACTS=(
     pkg_update
     pkg_upgrade
@@ -18,8 +18,16 @@ PKG_MANAGER_CONTRACTS=(
     pkg_is_installed
     pkg_autoremove
     proot_exec
+    proot_exec_root
+    proot_install
+    proot_remove
     proot_pkg_install
+    proot_pkg_install_root
     proot_pkg_is_installed
+    proot_pkg_update
+    proot_pkg_update_root
+    proot_pkg_remove
+    proot_pkg_autoremove
 )
 
 # ui 포트가 요구하는 함수 목록
@@ -30,6 +38,13 @@ UI_CONTRACTS=(
     ui_select
     ui_confirm
     ui_input
+)
+
+# script_builder 포트가 요구하는 함수 목록
+SCRIPT_BUILDER_CONTRACTS=(
+    script_build_start_xfce
+    script_build_kill_x11
+    script_build_cp2menu
 )
 
 _check_adapter_contracts() {
@@ -99,29 +114,45 @@ _test_ui_zenity_contracts() {
 it "ui_zenity.sh가 모든 ui 계약을 구현한다" _test_ui_zenity_contracts
 
 # =============================================================================
+# script_builder 계약 — 모든 script_builder_*.sh 어댑터
+# =============================================================================
+
+describe "포트 계약 — script_builder_zenity.sh"
+
+_test_script_builder_zenity_contracts() {
+    if [ ! -f "${ADAPTER_DIR}/script_builder_zenity.sh" ]; then
+        return 0
+    fi
+    ( _check_adapter_contracts "${ADAPTER_DIR}/script_builder_zenity.sh" "${SCRIPT_BUILDER_CONTRACTS[@]}" )
+}
+it "script_builder_zenity.sh가 모든 script_builder 계약을 구현한다" _test_script_builder_zenity_contracts
+
+# =============================================================================
 # _pkg_manager_check — 어댑터 미로드 시 에러
 # =============================================================================
 
 describe "포트 계약 — _pkg_manager_check"
 
 _test_pkg_check_fails_without_adapter() {
+    local rc=0
     (
         unset -f pkg_install 2>/dev/null || true
         source "${SCRIPT_DIR}/../ports/pkg_manager.sh"
         _pkg_manager_check
-    )
+    ) 2>/dev/null || rc=$?
     # 위 서브셸은 exit 1로 종료해야 함
-    assert_nonzero $? "_pkg_manager_check는 어댑터 없으면 1을 반환해야 한다"
+    assert_nonzero "$rc" "_pkg_manager_check는 어댑터 없으면 1을 반환해야 한다"
 }
 it "어댑터 없으면 _pkg_manager_check가 실패한다" _test_pkg_check_fails_without_adapter
 
 _test_pkg_check_passes_with_adapter() {
+    local rc=0
     (
         pkg_install() { :; }
         source "${SCRIPT_DIR}/../ports/pkg_manager.sh"
         _pkg_manager_check
-    )
-    assert_zero $? "_pkg_manager_check는 어댑터 있으면 0을 반환해야 한다"
+    ) || rc=$?
+    assert_zero "$rc" "_pkg_manager_check는 어댑터 있으면 0을 반환해야 한다"
 }
 it "어댑터 있으면 _pkg_manager_check가 성공한다" _test_pkg_check_passes_with_adapter
 

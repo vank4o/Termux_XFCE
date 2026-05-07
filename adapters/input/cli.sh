@@ -37,6 +37,8 @@ parse_cli_args() {
                 INSTALL_GPU=false; shift ;;
             --gpu-dev)
                 INSTALL_GPU_DEV=true; shift ;;
+            --no-gpu-dev)
+                INSTALL_GPU_DEV=false; shift ;;
             --korean)
                 SKIP_KOREAN=false; shift ;;
             --no-korean)
@@ -66,6 +68,7 @@ _cli_usage() {
       --gpu               GPU 가속 설치
       --no-gpu            GPU 가속 생략
       --gpu-dev           GPU 개발 도구 설치
+      --no-gpu-dev        GPU 개발 도구 생략
       --korean            한글 입력기(fcitx5) 설치
       --no-korean         한글 입력기 생략
       --korean-locale         XFCE 한글 로케일 강제 적용 (LD_PRELOAD 기반)

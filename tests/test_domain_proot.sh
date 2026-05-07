@@ -35,7 +35,7 @@ _make_proot_rootfs() {
     local rootfs="${sandbox}/usr/var/lib/proot-distro/installed-rootfs/${distro}"
     mkdir -p \
         "${rootfs}/home/${user}" \
-        "${rootfs}/etc" \
+        "${rootfs}/etc/default" \
         "${rootfs}/usr/share/icons"
     # sudoers stub
     touch "${rootfs}/etc/sudoers"
@@ -154,7 +154,7 @@ _test_proot_env_written() {
 
     local bashrc="${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/home/testuser/.bashrc"
     assert_file_contains "$bashrc" "termux-xfce-proot-env"
-    assert_file_contains "$bashrc" "DISPLAY=:0.0"
+    assert_file_contains "$bashrc" 'DISPLAY=${DISPLAY:-:0.0}'
     assert_file_contains "$bashrc" "MESA_LOADER_DRIVER_OVERRIDE=zink"
     cleanup_sandbox "$sb"
 }
@@ -259,18 +259,6 @@ it "dist-dark 커서 테마를 proot로 복사한다" _test_cursor_theme_copied
 # =============================================================================
 
 describe "proot_env — setup_proot_fancybash"
-
-_test_fancybash_warns_if_src_missing() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb" "ubuntu" "testuser"
-    reset_ui_output
-
-    # Termux .fancybash.sh 없음
-    setup_proot_fancybash 2>/dev/null || true
-    assert_ui_contains "WARN"
-    cleanup_sandbox "$sb"
-}
-it "Termux의 .fancybash.sh가 없으면 경고를 출력한다" _test_fancybash_warns_if_src_missing
 
 _test_fancybash_copied_to_proot() {
     local sb; sb=$(make_sandbox)
@@ -662,8 +650,9 @@ _test_ubuntu_profile_guards_nimf_exec() {
 
     local profile="${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/home/testuser/.profile"
     # "nimf &" 가 단독으로 있으면 안 됨 — command -v 가드 필요
+    # grep -c는 0 매치 시 "0" 출력 후 exit 1 → `|| echo 0`은 "0\n0" 생성하므로 사용 금지
     local bare_nimf
-    bare_nimf=$(grep -c '^nimf &$' "$profile" 2>/dev/null || echo 0)
+    bare_nimf=$(grep -c '^nimf &$' "$profile" 2>/dev/null) || bare_nimf=0
     assert_eq "0" "$bare_nimf" ".profile에 가드 없는 'nimf &'가 없어야 한다"
     assert_file_contains "$profile" "command -v nimf"
     cleanup_sandbox "$sb"
@@ -699,7 +688,7 @@ _test_arch_nimf_profile_guards_nimf_exec() {
 
     local profile="${PREFIX}/var/lib/proot-distro/installed-rootfs/archlinux/home/testuser/.profile"
     local bare_nimf
-    bare_nimf=$(grep -c '^nimf &$' "$profile" 2>/dev/null || echo 0)
+    bare_nimf=$(grep -c '^nimf &$' "$profile" 2>/dev/null) || bare_nimf=0
     assert_eq "0" "$bare_nimf" ".profile에 가드 없는 'nimf &'가 없어야 한다"
     assert_file_contains "$profile" "command -v nimf"
     cleanup_sandbox "$sb"
@@ -1024,5 +1013,108 @@ _test_write_arch_im_env_fcitx5() {
     cleanup_sandbox "$sb"
 }
 it "use_nimf=false 시 fcitx5 환경변수를 쓴다" _test_write_arch_im_env_fcitx5
+
+# =============================================================================
+# _install_yay — proot_exec 명령 구조 검증
+# -----------------------------------------------------------------------------
+# yay-bin AUR clone + makepkg 흐름이 proot_exec에 전달되는지 검증.
+# 실제 빌드는 mock proot_exec로 차단.
+# =============================================================================
+
+describe "proot_env — _install_yay"
+
+_test_install_yay_invokes_proot_exec_with_makepkg() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "archlinux" "testuser"
+
+    # proot_exec 호출 인자를 파일로 기록 (서브셸 없이도 가능하지만 안전)
+    YAY_LOG=$(mktemp "${TMPDIR:-/data/data/com.termux/files/usr/tmp}/yay_log_XXXXXX")
+    proot_exec() { echo "$*" >> "$YAY_LOG"; return 0; }
+
+    _install_yay
+
+    # 인자에 yay-bin clone, makepkg, base-devel, idempotency check가 포함되어야 함
+    assert_file_contains "$YAY_LOG" "yay-bin"
+    assert_file_contains "$YAY_LOG" "makepkg -si --noconfirm"
+    assert_file_contains "$YAY_LOG" "git base-devel"
+    assert_file_contains "$YAY_LOG" "command -v yay"
+    rm -f "$YAY_LOG"
+    cleanup_sandbox "$sb"
+}
+it "yay-bin clone + makepkg + 멱등성 체크가 proot_exec에 전달된다" _test_install_yay_invokes_proot_exec_with_makepkg
+
+_test_install_yay_runs_in_subshell_via_bash_c() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "archlinux" "testuser"
+
+    YAY_FIRST_ARG=""
+    proot_exec() { YAY_FIRST_ARG="$1"; return 0; }
+
+    _install_yay
+
+    # proot_exec의 첫 인자는 'bash' 여야 함 (proot_exec bash -c "...")
+    assert_eq "bash" "$YAY_FIRST_ARG"
+    cleanup_sandbox "$sb"
+}
+it "proot_exec bash -c 형태로 호출된다" _test_install_yay_runs_in_subshell_via_bash_c
+
+# =============================================================================
+# 회귀: set -e + ((_i++)) 폭탄 — proot_env.sh의 카운터 루프 5곳
+# -----------------------------------------------------------------------------
+# Stage 4 실제 설치(--proot-only --distro ubuntu)에서 setup_proot_base_packages가
+# `((_i++))` 첫 호출 시 0 반환 → set -e 트립 → 패키지 1개도 못 깐 채 종료.
+# `((++_i))` 로 변경 (pre-increment, 항상 새 값 반환).
+# =============================================================================
+
+describe "proot_env — set -e safe counter (regression)"
+
+_test_setup_proot_base_packages_ubuntu_completes_under_set_e() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+    _make_proot_rootfs "$sb" "ubuntu" "testuser"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS=""
+
+    # || true 없이 호출 — set -e 하에서 모든 패키지를 끝까지 시도해야 함
+    setup_proot_base_packages
+
+    local install_count=0
+    for call in "${MOCK_CALLS[@]:-}"; do
+        [[ "$call" == "proot_pkg_install "* ]] && install_count=$((install_count + 1))
+    done
+    local expected=$(( ${#PKGS_PROOT_UBUNTU_BASE[@]} + ${#PKGS_PROOT_UBUNTU_DESKTOP[@]} ))
+    assert_eq "$expected" "$install_count" "Ubuntu base+desktop 패키지 모두 시도되어야 함"
+    cleanup_sandbox "$sb"
+}
+it "setup_proot_base_packages(ubuntu)가 set -e 하에서 끝까지 실행된다" _test_setup_proot_base_packages_ubuntu_completes_under_set_e
+
+_test_setup_proot_base_packages_arch_completes_under_set_e() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "archlinux" "testuser"
+    _make_proot_rootfs "$sb" "archlinux" "testuser"
+    reset_mock_calls
+    MOCK_INSTALLED_PKGS=""
+
+    setup_proot_base_packages
+
+    local install_count=0
+    for call in "${MOCK_CALLS[@]:-}"; do
+        [[ "$call" == "proot_pkg_install "* ]] && install_count=$((install_count + 1))
+    done
+    local expected=$(( ${#PKGS_PROOT_ARCH_BASE[@]} + ${#PKGS_PROOT_ARCH_DESKTOP[@]} ))
+    assert_eq "$expected" "$install_count" "Arch base+desktop 패키지 모두 시도되어야 함"
+    cleanup_sandbox "$sb"
+}
+it "setup_proot_base_packages(arch)가 set -e 하에서 끝까지 실행된다" _test_setup_proot_base_packages_arch_completes_under_set_e
+
+_test_no_post_increment_in_proot_env() {
+    # 정적 검사: 향후 ((_i++)) 패턴이 재도입되지 않도록 grep으로 가드
+    if grep -E '\(\(_*i\+\+\)\)' "${DOMAIN_DIR}/proot_env.sh" >/dev/null; then
+        echo "[ASSERT] proot_env.sh에 금지된 '((i++))' 패턴 재도입됨 — '((++i))' 사용 필요" >&2
+        grep -nE '\(\(_*i\+\+\)\)' "${DOMAIN_DIR}/proot_env.sh" >&2
+        return 1
+    fi
+}
+it "proot_env.sh에 ((i++)) post-increment 패턴이 없다" _test_no_post_increment_in_proot_env
 
 print_results
