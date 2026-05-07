@@ -45,6 +45,16 @@ resolve_interactive_inputs() {
         export SKIP_KOREAN
     fi
 
+    # XFCE 한글 로케일 (메뉴/UI 한글화)
+    if [ -z "${KOREAN_LOCALE:-}" ]; then
+        if ui_confirm "XFCE 메뉴/UI를 한글로 표시하겠습니까? (한글 로케일 적용)"; then
+            KOREAN_LOCALE=true
+        else
+            KOREAN_LOCALE=false
+        fi
+        export KOREAN_LOCALE
+    fi
+
     # GPU 가속
     if [ -z "${INSTALL_GPU:-}" ]; then
         if ui_confirm "GPU 가속(mesa + Turnip Vulkan, Adreno)을 설치하겠습니까?"; then
