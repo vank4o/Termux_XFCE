@@ -18,7 +18,7 @@ parse_cli_args() {
     export SKIP_PROOT="${SKIP_PROOT:-false}"
     export PROOT_ONLY="${PROOT_ONLY:-false}"
     export SKIP_KOREAN="${SKIP_KOREAN:-}"
-    export KOREAN_LOCALE="${KOREAN_LOCALE:-false}"
+    export KOREAN_LOCALE="${KOREAN_LOCALE:-}"
     export KOREAN_LOCALE_ZIP="${KOREAN_LOCALE_ZIP:-}"
 
     while [[ $# -gt 0 ]]; do
