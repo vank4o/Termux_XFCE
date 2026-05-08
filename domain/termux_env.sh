@@ -261,6 +261,37 @@ LOCALE
     done < <(_rc_targets)
 }
 
+setup_korean_rc() {
+    local block
+    block=$(cat << 'KOREAN'
+
+# termux-xfce-korean — force_gettext.so 한글 UI 자동 적용
+if [ -f "$PREFIX/lib/force_gettext.so" ]; then
+    export LANGUAGE="ko_KR:ko:en_US:en"
+    export FORCE_TEXTDOMAINDIR="$PREFIX/share/locale"
+    export FALLBACK_DOMAINS="mousepad xfce4-terminal thunar ristretto \
+gtk30 glib20 gdk-pixbuf libxfce4ui-2 libxfce4util exo garcon \
+xfce4-session xfce4-settings xfce4-panel xfdesktop xfconf vte-2.91 \
+gtksourceview-5 gtksourceview-4 gimp20 gimp30 gimp20-std-plugins \
+gimp30-plugins gegl-0.4 babl inkscape \
+vlc kdenlive kxmlgui6 kwidgetsaddons6 kconfigwidgets6 kcoreaddons6 \
+kitemviews6 kiconthemes6 kio6 sonnet6 knewstuff6 ktextwidgets6 \
+knotifications6 kservice6 solid6 kguiaddons6 kcolorscheme6"
+    export XDG_DATA_DIRS="$PREFIX/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
+    QT_TRANSLATIONS_PATH="$PREFIX/share/qt6/translations:$PREFIX/share/qt/translations${QT_TRANSLATIONS_PATH:+:$QT_TRANSLATIONS_PATH}"
+    export QT_TRANSLATIONS_PATH
+    export KDE_LANG=ko QT_LOCALE_OVERRIDE=ko_KR
+    case ":${LD_PRELOAD-}:" in *:"$PREFIX/lib/force_gettext.so":*) ;; *)
+        export LD_PRELOAD="$PREFIX/lib/force_gettext.so${LD_PRELOAD:+:$LD_PRELOAD}";; esac
+fi
+KOREAN
+)
+
+    while IFS= read -r rc; do
+        _append_to_rc "# termux-xfce-korean" "$block" "$rc"
+    done < <(_rc_targets)
+}
+
 # XDG runtime dir: mode 700 user-private ($PREFIX/var/run/user/$UID)
 # Why: 구버전 _setup_locale가 XDG_RUNTIME_DIR=$TMPDIR(mode 1777, world-writable)을 심어
 #      dbus가 "can be written by others" 경고를 띄우며 session bus를 반쯤 고장냄

@@ -28,6 +28,9 @@ setup_korean_locale_native() {
     ui_info "한글 로케일 — startxfce4-ko 래퍼 생성"
     _install_startxfce4_ko_wrapper
 
+    ui_info "한글 로케일 — RC 파일에 환경변수 영구 등록"
+    setup_korean_rc
+
     ui_info "한글 로케일 — DBus 환경 전파 autostart 등록"
     _install_dbus_propagate_autostart
 }
