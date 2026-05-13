@@ -162,7 +162,7 @@ fi
 # 단계 카운터 — 선택 옵션에 따라 총 단계 수 계산
 _step=0
 _total=5  # 기본: base + xfce + shortcuts + x11apk + companion-apks
-[ "${SKIP_PROOT:-true}" != "true" ] && [ -n "${PROOT_DISTRO:-}" ] && _total=$((_total + 1))
+[ "${SKIP_PROOT:-false}" != "true" ] && [ -n "${PROOT_DISTRO:-}" ] && _total=$((_total + 1))
 _step_msg() { _step=$((_step + 1)); ui_info "=== [${_step}/${_total}] $1 ==="; }
 
 if [ "${PROOT_ONLY:-false}" != "true" ]; then
