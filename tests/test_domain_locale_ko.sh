@@ -23,6 +23,7 @@ _load_domain() {
 
     export SCRIPT_DIR="${SCRIPT_DIR}/.."
     source "${DOMAIN_DIR}/packages.sh" 2>/dev/null || true
+    source "${DOMAIN_DIR}/termux_env.sh" 2>/dev/null || true
     source "${DOMAIN_DIR}/locale_ko.sh" 2>/dev/null || true
 }
 
@@ -69,13 +70,14 @@ _test_locale_native_runs_all_steps() {
 
     setup_korean_locale_native 2>/dev/null || true
 
-    # 3단계 INFO 메시지 확인
     assert_ui_contains "glibc .mo 카탈로그"
     assert_ui_contains "force_gettext.so"
     assert_ui_contains "startxfce4-ko"
+    assert_ui_contains "RC 파일에 환경변수 영구 등록"
+    assert_ui_contains "DBus 환경 전파"
     cleanup_sandbox "$sb"
 }
-it "유효한 zip 경로 시 3단계(카탈로그+빌드+래퍼)를 모두 실행한다" _test_locale_native_runs_all_steps
+it "유효한 zip 경로 시 5단계를 모두 실행한다" _test_locale_native_runs_all_steps
 
 # =============================================================================
 # _deploy_locale_catalogs — .mo 카탈로그 배치
@@ -263,6 +265,85 @@ _test_ko_wrapper_syntax_valid() {
     cleanup_sandbox "$sb"
 }
 it "startxfce4-ko의 bash 문법 오류가 없다" _test_ko_wrapper_syntax_valid
+
+# =============================================================================
+# setup_korean_rc — RC 파일에 한글 환경변수 영구 등록
+# =============================================================================
+
+describe "locale_ko — setup_korean_rc"
+
+_test_korean_rc_writes_to_bashrc() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    setup_korean_rc 2>/dev/null || true
+
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "termux-xfce-korean"
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "FALLBACK_DOMAINS"
+    cleanup_sandbox "$sb"
+}
+it "bash.bashrc에 한글 환경변수 블록을 추가한다" _test_korean_rc_writes_to_bashrc
+
+_test_korean_rc_has_lang() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    setup_korean_rc 2>/dev/null || true
+
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" 'LANG="ko_KR.UTF-8"'
+    cleanup_sandbox "$sb"
+}
+it "LANG=ko_KR.UTF-8을 설정한다" _test_korean_rc_has_lang
+
+_test_korean_rc_has_ld_preload_guard() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    setup_korean_rc 2>/dev/null || true
+
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "force_gettext.so"
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "LD_PRELOAD"
+    cleanup_sandbox "$sb"
+}
+it "LD_PRELOAD에 force_gettext.so 중복 방지 guard가 있다" _test_korean_rc_has_ld_preload_guard
+
+_test_korean_rc_uses_shared_constant() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    setup_korean_rc 2>/dev/null || true
+
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "mousepad"
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "thunar"
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" "kcolorscheme6"
+    cleanup_sandbox "$sb"
+}
+it "FALLBACK_DOMAINS에 공유 상수의 도메인 목록이 포함된다" _test_korean_rc_uses_shared_constant
+
+_test_korean_rc_idempotent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    setup_korean_rc 2>/dev/null || true
+    setup_korean_rc 2>/dev/null || true
+
+    local count
+    count=$(grep -c "termux-xfce-korean" "${PREFIX}/etc/bash.bashrc")
+    assert_eq "1" "$count" "멱등성: 마커가 1번만 있어야 한다"
+    cleanup_sandbox "$sb"
+}
+it "멱등성 — 두 번 호출해도 블록이 중복되지 않는다" _test_korean_rc_idempotent
+
+_test_korean_rc_conditional_on_so() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    setup_korean_rc 2>/dev/null || true
+
+    assert_file_contains "${PREFIX}/etc/bash.bashrc" 'if \[ -f "\$PREFIX/lib/force_gettext.so" \]'
+    cleanup_sandbox "$sb"
+}
+it "force_gettext.so 존재 여부를 조건으로 감싼다" _test_korean_rc_conditional_on_so
 
 # =============================================================================
 # _install_dbus_propagate_autostart — desktop 파일 생성

@@ -130,14 +130,7 @@ if [ -f "$_PREFIX/lib/force_gettext.so" ]; then
     export LANG="ko_KR.UTF-8"
     export LANGUAGE="ko_KR:ko:en_US:en"
     export FORCE_TEXTDOMAINDIR="$_PREFIX/share/locale"
-    export FALLBACK_DOMAINS="mousepad xfce4-terminal thunar ristretto \
-gtk30 glib20 gdk-pixbuf libxfce4ui-2 libxfce4util exo garcon \
-xfce4-session xfce4-settings xfce4-panel xfdesktop xfconf vte-2.91 \
-gtksourceview-5 gtksourceview-4 gimp20 gimp30 gimp20-std-plugins \
-gimp30-plugins gegl-0.4 babl inkscape \
-vlc kdenlive kxmlgui6 kwidgetsaddons6 kconfigwidgets6 kcoreaddons6 \
-kitemviews6 kiconthemes6 kio6 sonnet6 knewstuff6 ktextwidgets6 \
-knotifications6 kservice6 solid6 kguiaddons6 kcolorscheme6"
+    export FALLBACK_DOMAINS="__KOREAN_FALLBACK_DOMAINS__"
     export XDG_DATA_DIRS="$_PREFIX/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
     QT_TRANSLATIONS_PATH="$_PREFIX/share/qt6/translations:$_PREFIX/share/qt/translations${QT_TRANSLATIONS_PATH:+:$QT_TRANSLATIONS_PATH}"
     export QT_TRANSLATIONS_PATH
@@ -175,6 +168,7 @@ else
         dbus-launch --exit-with-session xfce4-session &
 fi
 EOF
+    sed -i "s|__KOREAN_FALLBACK_DOMAINS__|${_KOREAN_FALLBACK_DOMAINS:-}|" "$output"
 }
 
 script_build_kill_x11() {
