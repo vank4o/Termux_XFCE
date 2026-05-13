@@ -19,6 +19,8 @@ PKGS_TERMUX_BASE=(
     dbus
     pulseaudio
     yad            # app-installer 검색 가능 GUI (zenity 대체)
+    termux-api     # Android API 브리지 (클립보드, 알림, 배터리 등)
+    xclip          # X11 클립보드 — Android↔XFCE 동기화용
 )
 
 # XFCE 데스크탑 환경
@@ -58,40 +60,6 @@ PKGS_TERMUX_CLI=(
     zellij      # tmux 대안 — 세션 멀티플렉서
     dust        # du 시각화 — 스토리지 확인
     duf         # df 현대적 대체
-)
-
-# 한글 입력기
-PKGS_TERMUX_KOREAN=(
-    fcitx5
-    fcitx5-hangul
-    fcitx5-configtool
-    libhangul
-    libhangul-static
-)
-
-# GPU 가속 (Adreno/Turnip + Zink)
-# mesa 26.x (메인 저장소)에 zink_dri.so 내장 — TUR의 mesa-zink/osmesa-zink 불필요
-# mesa-zink(TUR)는 mesa와 Conflicts/Replaces 관계라 설치 시 xfce4 의존성 체인이 깨짐
-PKGS_TERMUX_GPU=(
-    mesa                           # OpenGL (zink_dri.so 내장) — 메인 저장소 26.x
-    mesa-dev
-    mesa-demos
-    mesa-vulkan-icd-freedreno      # Turnip Vulkan 드라이버 (Adreno Zink 백엔드)
-    vulkan-loader-generic          # Vulkan 로더
-    mesa-vulkan-icd-swrast         # 소프트웨어 Vulkan 폴백
-)
-
-# GPU 개발 도구 (선택적)
-PKGS_TERMUX_GPU_DEV=(
-    clvk
-    clinfo
-    gtkmm4
-    libsigc++-3.0
-    libcairomm-1.16
-    libglibmm-2.68
-    libpangomm-2.48
-    swig
-    libpeas
 )
 
 # proot-distro 설치에 필요한 Termux 패키지

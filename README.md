@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**[English](README.md)** &nbsp;|&nbsp; [한국어](README.ko.md)
+**[한국어](README.md)** &nbsp;|&nbsp; [English](README.en.md)
 
 [![Android](https://img.shields.io/badge/Android-Termux-3DDC84?logo=android)](https://termux.dev)
 [![Arch](https://img.shields.io/badge/Arch-aarch64-0070C0)](https://github.com/yanghoeg/Termux_XFCE)
@@ -12,309 +12,263 @@
 
 ---
 
-Bash script that automatically installs **XFCE desktop environment** on Termux for Android.  
-Derived from [phoenixbyrd/Termux_XFCE](https://github.com/phoenixbyrd/Termux_XFCE).
+Android 기기의 Termux에서 **XFCE 데스크탑 환경**을 자동 설치하는 Bash 스크립트입니다.  
+[phoenixbyrd/Termux_XFCE](https://github.com/phoenixbyrd/Termux_XFCE) 에서 파생되었습니다.
 
-**Tested devices**: Galaxy Fold6 (Adreno 750, SD 8 Gen3), Galaxy Tab S9 Ultra (Adreno 740, SD 8 Gen2)
+**테스트 기기**: Galaxy Fold6 (Adreno 750, SD 8 Gen3), Galaxy Tab S9 Ultra (Adreno 740, SD 8 Gen2)
 
-## Features
+## 특징
 
-- **Termux native first** — XFCE, Firefox, fcitx5-hangul, GPU acceleration all installed as Termux native
-- **Optional proot** — Ubuntu / Arch Linux / none
-- **Hexagonal Architecture** — distro abstraction keeps Ubuntu & Arch code unified
-- **Idempotent** — already installed items are skipped automatically
-- **GPU acceleration** — Zink + Turnip auto-activated for Adreno 6xx/7xx/8xx
-- **zsh + Powerlevel10k** — set as default shell with autosuggestions & syntax-highlighting
+- **Termux native 우선** — XFCE, Firefox, GPU 가속 모두 Termux 네이티브 설치
+- **proot 선택 가능** — Ubuntu / Arch Linux / 없음
+- **헥사고날 아키텍처** — distro 추상화로 Ubuntu·Arch 공통 코드 유지
+- **멱등성** — 이미 설치된 항목은 자동으로 건너뜀
+- **GPU 가속** — Adreno 6xx/7xx/8xx에서 Zink + Turnip 자동 활성화
+- **Termux API 연동** — Android 클립보드 동기화, 배터리 모니터, 밝기/볼륨 조절
+- **zsh + Powerlevel10k** — 기본 쉘로 설정, 자동완성·구문강조 포함
 
-## Installation
+## 설치
 
-> **Just run `install.sh` — every option below is asked interactively.**
-> The flags & env vars are only for non-interactive / scripted installs. If you don't pass them, the installer prompts for distro, username, GPU, Korean input, etc. on the terminal.
+> **그냥 `install.sh`만 실행하면 됩니다 — 모든 옵션은 대화형으로 물어봅니다.**  
+> 플래그/환경변수는 비대화형(스크립트) 설치용입니다.
 
 ```bash
-# one-liner (auto clones repo then runs — interactive)
+# one-liner (자동 clone 후 실행 — 대화형)
 curl -sL https://raw.githubusercontent.com/yanghoeg/Termux_XFCE/main/install.sh | bash
 ```
 
 ```bash
-# non-interactive: with options
-bash install.sh --distro ubuntu --user <username> --gpu
+# 비대화형: 옵션 지정
+bash install.sh --distro ubuntu --user <username>
 bash install.sh --distro archlinux --user <username>
-bash install.sh --no-proot          # Termux native only
-bash install.sh --distro ubuntu --user <username> --gpu --gpu-dev
-bash install.sh --distro archlinux --user <username> --proot-only  # add 2nd distro
+bash install.sh --no-proot          # Termux native만
+bash install.sh --distro archlinux --user <username> --proot-only  # 두 번째 distro 추가
 ```
 
 ```bash
-# non-interactive: via environment variables
-DISTRO=ubuntu USERNAME=<username> INSTALL_GPU=true bash install.sh
+# 비대화형: 환경변수로 지정
+DISTRO=ubuntu USERNAME=<username> bash install.sh
 ```
 
-| Option | Env var | Description |
-|--------|---------|-------------|
-| `--distro ubuntu\|archlinux` | `DISTRO=` | proot distro |
-| `--user <name>` | `USERNAME=` | proot username |
-| `--no-proot` | `SKIP_PROOT=true` | Termux native only |
-| `--proot-only` | `PROOT_ONLY=true` | proot only (skip Termux native setup, for adding a 2nd distro) |
-| `--gpu` | `INSTALL_GPU=true` | Install GPU acceleration |
-| `--gpu-dev` | `INSTALL_GPU_DEV=true` | Install GPU dev tools |
-| `--korean-locale` | `KOREAN_LOCALE=true` | Enable Korean locale opt-in (see "Korean Locale") |
-| `--locale-zip <path>` | `KOREAN_LOCALE_ZIP=` | Path to .mo catalog zip (Release asset) |
+| 옵션 | 환경변수 | 설명 |
+|------|----------|------|
+| `--distro ubuntu\|archlinux` | `DISTRO=` | proot distro 선택 |
+| `--user <이름>` | `USERNAME=` | proot 사용자 이름 |
+| `--no-proot` | `SKIP_PROOT=true` | proot 없이 native만 |
+| `--proot-only` | `PROOT_ONLY=true` | proot만 설치 (두 번째 distro 추가 시) |
 
-## Usage
+> GPU 가속, 한글 입력기 등 선택적 구성요소는 설치 후 `app-installer`에서 관리합니다.
+
+## 사용법
 
 ```bash
-startXFCE          # Start XFCE desktop
-ubuntu             # Enter Ubuntu proot
-archlinux          # Enter Arch Linux proot
-prun libreoffice   # Run proot app from Termux terminal
-cp2menu            # Copy proot .desktop files to XFCE menu
-app-installer      # GUI for installing/removing extra apps
+startXFCE          # XFCE 데스크탑 시작
+ubuntu             # Ubuntu proot 진입
+archlinux          # Arch Linux proot 진입
+prun libreoffice   # proot 앱을 Termux에서 직접 실행
+cp2menu            # proot .desktop 파일을 XFCE 메뉴에 복사
+app-installer      # 앱 추가 설치/제거 GUI
 ```
 
-## GPU Acceleration
+## GPU 가속
 
-Hardware acceleration via **Zink (OpenGL→Vulkan) + Turnip driver** on Adreno GPUs (Snapdragon 6xx/7xx/8xx).  
-Applied automatically to every bash/zsh session after installation.
+Adreno GPU(Snapdragon 6xx/7xx/8xx)에서 **Zink(OpenGL→Vulkan) + Turnip** 드라이버로 하드웨어 가속이 동작합니다.  
+설치 후 모든 bash/zsh 세션에서 자동 적용됩니다.
 
-> **Why Zink, not glamor?**  
-> `glamor_egl` (X11 OpenGL acceleration) requires a DRI3-capable driver, but Termux:X11 Xwayland does not expose DRI3 for Adreno.  
-> Zink routes OpenGL calls through Vulkan (Turnip), which **does** work via `/dev/kgsl-3d0` — the only path to hardware acceleration on Adreno today.
+> **glamor 단독으로는 안 되는 이유**  
+> X11의 OpenGL 가속(`glamor_egl`)은 DRI3 지원이 필요하지만, Termux:X11의 Xwayland는 Adreno DRI3를 노출하지 않습니다.  
+> Zink는 OpenGL 호출을 Vulkan(Turnip)으로 우회해 `/dev/kgsl-3d0`을 통해 GPU에 접근합니다.
 
-> **GTK4 apps crashing? (zenity, etc.)**  
-> Zink + Turnip fails to create a GLX swap chain with Termux:X11 nightly APK → `GLXBadCurrentWindow`.  
-> Fixed by `GSK_RENDERER=cairo` (Cairo software renderer for GTK4). Already set automatically.  
-> Use `glmark2-es2` (EGL) instead of `glmark2` (GLX).
+> **GTK4 앱(zenity 등) 크래시 시**  
+> `GSK_RENDERER=cairo`(GTK4 Cairo 렌더러 강제)로 해결됩니다. 설치 시 자동 설정됩니다.
 
 ```bash
-# Verify Zink is active
 echo $MESA_LOADER_DRIVER_OVERRIDE   # → zink
-
-# Show GPU model
-gpu-info
-# or directly:
-cat /sys/class/kgsl/kgsl-3d0/gpu_model
-
-# FPS overlay
-hud glxgears
-
-# Explicit Zink (same as always-on, useful for overrides)
-zink glxgears
+gpu-info                             # GPU 모델 확인
+hud glxgears                         # FPS HUD 오버레이
 ```
 
-| Variable | Value | Role |
-|----------|-------|------|
-| `MESA_LOADER_DRIVER_OVERRIDE` | `zink` | Force OpenGL → Vulkan (Zink) |
-| `TU_DEBUG` | `noconform` | Disable Turnip conformance checks |
-| `ZINK_DESCRIPTORS` | `lazy` | Optimize descriptor updates |
-| `MESA_NO_ERROR` | `1` | Disable GL error checks |
-| `MESA_GL_VERSION_OVERRIDE` | `4.6COMPAT` | Advertise OpenGL 4.6 compat |
-| `MESA_GLES_VERSION_OVERRIDE` | `3.2` | Advertise GLES 3.2 |
-| `MESA_VK_WSI_PRESENT_MODE` | `immediate` | Disable Vulkan VSync (lower latency) |
-| `GSK_RENDERER` | `cairo` | GTK4 Cairo renderer (prevents GLX crash) |
-| `GALLIUM_HUD` | `fps` | FPS overlay (`hud` alias) |
+| 변수 | 값 | 역할 |
+|------|----|------|
+| `MESA_LOADER_DRIVER_OVERRIDE` | `zink` | OpenGL → Vulkan(Zink) 강제 |
+| `TU_DEBUG` | `noconform` | Turnip conformance 체크 비활성 |
+| `ZINK_DESCRIPTORS` | `lazy` | 디스크립터 업데이트 최적화 |
+| `MESA_NO_ERROR` | `1` | GL 에러 체크 비활성 |
+| `MESA_GL_VERSION_OVERRIDE` | `4.6COMPAT` | OpenGL 4.6 compat 광고 |
+| `MESA_GLES_VERSION_OVERRIDE` | `3.2` | GLES 3.2 광고 |
+| `MESA_VK_WSI_PRESENT_MODE` | `immediate` | Vulkan VSync 비활성 |
+| `GSK_RENDERER` | `cairo` | GTK4 Cairo 렌더러 (GLX 크래시 방지) |
 
-> **Note**: If the XFCE4 compositor (xfwm4) causes a black screen,  
-> go to Settings → Window Manager Tweaks → Compositor → uncheck "Enable display compositing"
+> **주의**: XFCE4 컴포지터(xfwm4)가 검은 화면을 유발할 경우  
+> 설정 → 창관리자(작업) → 컴포지터 → '화면 컴포지팅 활성화' 해제
 
-## Korean Locale (optional)
+## Termux API 연동
 
-Display XFCE menus / settings / app UI in Korean. Termux's bionic libc does not support `setlocale(LC_MESSAGES)`, so the usual "XFCE language setting" path won't work. We bypass this using an **LD_PRELOAD-based gettext hook**.
+설치 시 **Termux:API** 패키지와 APK가 자동으로 설치됩니다.
 
-> This approach is based on the method shared by **흡혈귀왕 at 미코 (Mini Device Korea)**. Thanks! 🙏
+### 자동 활성화
 
-### Usage
+- **클립보드 동기화** — XFCE 시작 시 Android↔X11 클립보드 양방향 동기화 데몬이 자동 실행
 
-```bash
-# 1) Enable Korean locale + point to locale.zip (downloaded from Release asset)
-bash install.sh --distro archlinux --user <username> --korean-locale --locale-zip ~/Downloads/locale.zip
+### App Installer에서 추가 설치
 
-# 2) Start XFCE in Korean mode
-tx11start --xstartup "$HOME/bin/startxfce4-ko"
-```
-
-### Components
-
-| File | Role |
+| 도구 | 설명 |
 |------|------|
-| `assets/force_gettext.c` | C source hooking gettext/dgettext/dcgettext + GTK label/button/menu/dialog symbols (built with `clang -shared`) |
-| `domain/locale_ko.sh` | `setup_korean_locale_native()` — places .mo catalogs, builds `.so`, creates `startxfce4-ko` wrapper |
-| `$PREFIX/lib/force_gettext.so` | Runtime-injected shared object |
-| `$HOME/bin/startxfce4-ko` | Wrapper that launches XFCE in Korean mode (with DBus autostart) |
+| Conky 배터리 | Conky 위젯에 배터리 잔량·온도 표시 |
+| 밝기 조절 | XFCE 패널용 화면 밝기 조절 스크립트 |
+| 볼륨 조절 | XFCE 패널용 볼륨 조절 스크립트 |
+| 알림 도구 | 스크립트에서 Android 알림바 전송 |
+| TTS 음성 | 텍스트를 음성으로 변환 (Android TTS) |
+| 음성인식 | 음성을 텍스트로 변환 (Android STT) |
+| 배경화면 동기화 | XFCE 배경화면을 Android에 적용 |
 
-`locale.zip` (~163MB of glibc .mo catalogs) is distributed separately as a **GitHub Release asset**, not bundled in the repo.
+## 한글 로케일 (옵션)
 
-### Verified apps
+XFCE 메뉴/설정/앱 UI를 한글로 표시합니다. Termux의 bionic libc가 `setlocale(LC_MESSAGES)`를 지원하지 않기 때문에 **LD_PRELOAD 기반 gettext 후킹**으로 우회합니다.
 
-GIMP, Inkscape, Audacity, Thunderbird, VLC (proot), XFCE Settings Manager — menus, dialogs, and tooltips render in Korean.
+> 이 접근법은 **미코(미니기기 코리아) — 흡혈귀왕님**이 공유해 주신 방법을 바탕으로 구현되었습니다. 🙏
 
-## Shell (zsh + Powerlevel10k)
+한글 입력기(fcitx5), 한글 로케일은 `app-installer`에서 설치할 수 있습니다.
 
-The installer sets **zsh** as the default shell and configures Powerlevel10k automatically.
+| 파일 | 역할 |
+|------|------|
+| `assets/force_gettext.c` | gettext 후킹 C 소스 (clang -shared 빌드) |
+| `domain/locale_ko.sh` | .mo 카탈로그 배치 + `.so` 빌드 |
+| `$PREFIX/lib/force_gettext.so` | 런타임 주입 shared object |
+
+## 쉘 (zsh + Powerlevel10k)
+
+설치 시 **zsh**가 기본 쉘로 설정되고 Powerlevel10k가 자동으로 구성됩니다.
 
 ```bash
-# Reconfigure p10k prompt
-p10k configure
+p10k configure        # p10k 프롬프트 재설정
 
-# Aliases installed automatically
+# 자동 설치되는 별칭
 ll          # eza -alhgF
 ls          # eza -lF --icons
 cat         # bat
-gpu-info    # show Adreno GPU model
-zink        # run app with Zink forced
-hud         # run app with FPS overlay
-zrunhud     # proot app + FPS + GPU
-shutdown    # kill -9 -1 (terminate all Termux processes)
+gpu-info    # Adreno GPU 모델 확인
+zink        # Zink 강제 지정으로 앱 실행
+hud         # FPS 오버레이로 앱 실행
 ```
 
-## What Gets Installed
+## 설치 구성
 
-### Termux Native (always)
+### Termux Native (항상 설치)
 
-| Category | Packages |
-|----------|----------|
-| Base utils | wget, unzip, dbus, pulseaudio, yad |
+| 분류 | 패키지 |
+|------|--------|
+| 기본 유틸 | wget, unzip, dbus, pulseaudio, yad, termux-api, xclip |
 | XFCE | xfce4, xfce4-goodies, firefox, papirus-icon-theme, termux-x11-nightly |
-| CLI | git, zsh, eza, bat, fzf, htop, jq, neofetch |
-| Korean IME | fcitx5, fcitx5-hangul, fcitx5-configtool |
-| GPU (optional) | mesa, mesa-vulkan-icd-freedreno, vulkan-loader-generic, mesa-vulkan-icd-swrast |
+| CLI | git, zsh, eza, bat, fzf, ripgrep, fd, zoxide, lazygit, htop, jq, neofetch |
+| APK | Termux:X11, Termux:API, Termux:Float |
 
-### proot (optional)
+### proot (선택)
 
-| distro | base | Korean IME | entry command |
-|--------|------|------------|---------------|
-| ubuntu | Ubuntu (proot-distro) | nimf (auto) | `ubuntu` |
-| archlinux | Arch Linux (proot-distro) | nimf (AUR) → fcitx5 fallback | `archlinux` |
-
-> **Arch Linux nimf support**
-> The installer automatically attempts an AUR build of nimf, falling back to fcitx5 on failure.
-> Manual retry: `yay -S nimf nimf-libhangul`
+| distro | 기반 | 진입 명령 |
+|--------|------|-----------|
+| ubuntu | Ubuntu (proot-distro) | `ubuntu` |
+| archlinux | Arch Linux (proot-distro) | `archlinux` |
 
 ## App Installer
 
-Extra apps (GIMP, Inkscape, Audacity, VLC, LibreOffice, Thunderbird, etc.) can be installed via the GUI:
+추가 앱·시스템 도구·Termux API 도구를 탭 기반 GUI로 설치/제거합니다:
 
 ```bash
-app-installer
+app-installer          # 전체 (탭: 앱 | 시스템 | Termux API | Wine)
+app-installer wine     # Wine 앱만
 ```
 
-- **yad-based search UI** — type app name/description to filter instantly (falls back to zenity if yad is missing)
-- **Categories** — Graphics / Media / Office / Browser / Dev / Security / Utility / Communication
-- **Termux native first** — GIMP, Inkscape, Audacity, Thunderbird install as Termux native (Korean locale supported)
-- **proot auto-routing** — VLC, LibreOffice etc. install inside proot; VSCode (code-oss), Burp Suite install as Termux native
+- **탭 기반 UI** — 앱 / 시스템 / Termux API / Wine 탭으로 분류
+- **검색** — 이름/설명 타이핑으로 즉시 필터링 (yad notebook, zenity 폴백)
+- **Termux native 우선** — GIMP, Inkscape, Thunderbird 등은 네이티브 설치
+- **proot 자동 라우팅** — VLC, LibreOffice 등은 proot 내부 설치
 
-Source: [yanghoeg/App-Installer](https://github.com/yanghoeg/App-Installer) (Git Submodule)
+소스: [yanghoeg/App-Installer](https://github.com/yanghoeg/App-Installer) (Git Submodule)
 
-## Tests
+## 테스트
 
 ```bash
-bash tests/run_tests.sh              # all 280 tests
+bash tests/run_tests.sh              # 전체 330개
 bash tests/run_tests.sh domain_termux
-bash tests/run_tests.sh domain_locale_ko
+bash tests/run_tests.sh e2e_install
 ```
 
-| Suite | Count | Coverage |
-|-------|-------|----------|
-| ports | 7 | adapter contract compliance |
+| 스위트 | 수 | 내용 |
+|--------|---|------|
+| ports | 7 | 어댑터 계약 준수 |
 | adapters | 24 | pkg_termux, ui_terminal, script_builder_zenity |
-| domain_termux | 45 | termux_env logic |
-| domain_xfce | 34 | xfce_env + migration logic |
-| domain_proot | 58 | proot_env logic (Ubuntu/Arch) |
-| domain_locale_ko | 18 | locale_ko logic (Korean locale) |
-| app_installer | 50 | installer script validation |
-| prun_ld_preload | 17 | prun / LD_PRELOAD regression |
-| e2e_install | 27 | end-to-end composition & regression |
-| **Total** | **280** | **All pass on real device** |
+| domain_termux | 55 | termux_env 로직 (API APK, 클립보드 동기화 포함) |
+| domain_xfce | 34 | xfce_env + 마이그레이션 |
+| domain_proot | 58 | proot_env (Ubuntu/Arch) |
+| domain_locale_ko | 18 | 한글 로케일 |
+| input_interactive | 8 | 대화형 입력 |
+| install_matrix | 14 | 설치 조합 매트릭스 |
+| app_installer | 103 | app-installer 검증 |
+| prun_ld_preload | 17 | prun / LD_PRELOAD 회귀 |
+| e2e_install | 28 | E2E 통합 & 회귀 |
+| **합계** | **330+** | **실기기 전체 통과** |
 
-## Android System Optimization
+## Android 시스템 최적화
 
-For a stable, smooth desktop experience, apply the following system-level settings.
+### 팬텀 프로세스 킬러 비활성화 (Android 12+)
 
-### Disable Phantom Process Killer (Android 12+)
-
-Android 12+ aggressively kills background child processes, which can force-terminate the desktop session.  
-Run via [LADB](https://github.com/hyperio546/ladb-builds/releases) or a PC ADB connection:
+[LADB](https://github.com/hyperio546/ladb-builds/releases) 또는 PC ADB 연결 후:
 
 ```bash
 adb shell "/system/bin/device_config put activity_manager max_phantom_processes 2147483647"
 ```
 
-### Disable Battery Optimization
+### 배터리 최적화 해제
 
-Go to **Android Settings → Apps → Termux** (and **Termux:X11**) → Battery → set to **Unrestricted**.  
-Without this, Android throttles CPU usage in the background, causing frame drops even with Zink active.
+**안드로이드 설정 → 앱 → Termux** (및 Termux:X11) → 배터리 → **제한 없음**.
 
 ### Wakelock
 
-`startXFCE` calls `termux-wake-lock` automatically. For extended sessions, also enable it from the Termux notification: tap **"Acquire wakelock"**.
+`startXFCE` 실행 시 `termux-wake-lock`이 자동 호출됩니다.
 
 ---
 
-## Known Issues
+## 알려진 문제
 
-### Termux:X11 — Right-click / Arrow Keys Broken After Switching Apps
+### Termux:X11 — 앱 전환 후 우클릭 오작동 / 방향키 불가
 
-**Symptoms**: After switching to another app and returning to Termux:X11, touch input registers as right-click and arrow keys stop working.
+Android가 앱 포커스 해제 시 키 릴리스 이벤트를 중단하여 Alt 키가 고착됩니다. ([#781](https://github.com/termux/termux-x11/issues/781))
 
-**Root Cause**: Android stops sending key-release events the moment an app loses focus. The Alt key gets stuck in a pressed state inside the X server — Alt+click = right-click, Alt+arrow = unexpected behavior. ([termux-x11 #781](https://github.com/termux/termux-x11/issues/781))
+**우회**: Alt 키를 한 번 더 누르거나, Super+I로 입력 리셋, 또는 제스처로 앱 전환.
 
-**No complete fix available**: Android's API does not support selective key interception, so there is no script-level solution. ([termux-x11 #253](https://github.com/termux/termux-x11/issues/253))
-
-> **Samsung DeX devices only**: Termux:X11 → Preferences → Keyboard → enable **"Intercept system shortcuts"** for a proper fix. This option is hidden on standard Android devices.
-
-**Workarounds**:
-- **Press Alt once** to release the stuck key (fastest)
-- **Super+I** shortcut for manual input reset (clears stuck Alt/Shift/Ctrl + resets pointer button map)
-- Switch apps via **swipe gesture** instead of Alt+Tab — the bug does not occur
-
-> The `fix-x11-input` autostart entry runs automatically at session start to initialize input state.
+> Samsung DeX: Termux:X11 → Preferences → Keyboard → "Intercept system shortcuts" 활성화.
 
 ---
 
-## Project Structure
+## 파일 구조
 
 ```
 Termux_XFCE/
-├── install.sh                    ← entry point + DI container
-├── ports/
-│   ├── pkg_manager.sh            ← package manager contract
-│   ├── script_builder.sh         ← runtime script builder contract
-│   └── ui.sh                     ← UI contract
+├── install.sh                    ← 진입점 + DI 컨테이너
+├── ports/                        ← 계약 정의 (인터페이스)
 ├── adapters/
-│   ├── input/
-│   │   ├── cli.sh                ← CLI arg / env var parsing
-│   │   └── interactive.sh        ← interactive prompts
-│   └── output/
-│       ├── pkg_termux.sh         ← Termux pkg adapter
-│       ├── pkg_ubuntu.sh         ← Ubuntu apt adapter
-│       ├── pkg_arch.sh           ← Arch pacman adapter
-│       ├── pkg_common_termux.sh  ← shared Termux pkg helpers
-│       ├── script_builder_zenity.sh ← startXFCE / kill / cp2menu script generator
-│       ├── ui_terminal.sh        ← echo-based UI
-│       ├── ui_yad.sh             ← yad searchable GUI (zenity superset)
-│       └── ui_zenity.sh          ← zenity GUI UI (fallback)
+│   ├── input/                    ← CLI 인자 / 대화형 입력
+│   └── output/                   ← pkg 어댑터, UI, 스크립트 빌더
 ├── domain/
-│   ├── packages.sh               ← package list definitions
-│   ├── termux_env.sh             ← Termux environment logic
-│   ├── xfce_env.sh               ← XFCE setup logic
-│   ├── proot_env.sh              ← proot logic (Ubuntu/Arch common)
-│   └── locale_ko.sh              ← Korean locale opt-in (LD_PRELOAD gettext hook)
-├── tar/
-│   ├── config/                   ← XFCE / autostart preset configs
-│   └── conky/                    ← Conky theme (Alterf)
-├── assets/
-│   └── force_gettext.c           ← gettext hooking C source (→ force_gettext.so)
-├── tests/                        ← 280 automated tests (9 suites)
-└── app-installer/                ← extra app GUI (Git Submodule)
+│   ├── packages.sh               ← 패키지 목록
+│   ├── termux_env.sh             ← Termux 환경 (API APK, 클립보드 동기화 포함)
+│   ├── xfce_env.sh               ← XFCE 설정
+│   ├── proot_env.sh              ← proot (Ubuntu/Arch 공통)
+│   └── locale_ko.sh              ← 한글 로케일 (LD_PRELOAD)
+├── tests/                        ← 자동화 테스트 330개
+└── app-installer/                ← 앱 설치 GUI (Git Submodule)
+    ├── install.sh                ← yad notebook 탭 GUI
+    └── domain/installers/        ← 앱별 설치 스크립트 (31개)
 ```
 
-## Branch Strategy
+## 브랜치 전략
 
-| Branch | Purpose |
-|--------|---------|
-| `main` | Stable — real-device tested, for end users |
-| `dev` | Development — merged to main after tests pass |
+| 브랜치 | 용도 |
+|--------|------|
+| `main` | 안정 — 실기기 테스트 완료, 최종 사용자용 |
+| `dev` | 개발 중 — 테스트 통과 후 main에 머지 |
 
-## Contributing
+## 기여
 
-Bug reports and PRs are welcome via GitHub Issues / Pull Requests.
+버그 리포트·PR은 GitHub Issues / Pull Requests를 통해 환영합니다.

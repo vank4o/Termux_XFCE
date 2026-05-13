@@ -335,40 +335,6 @@ _test_gpu_adreno_8xx_info() {
 it "Adreno 8xx GPU 감지 시 8xx 정보를 출력한다" _test_gpu_adreno_8xx_info
 
 # =============================================================================
-# setup_termux_gpu — 패키지 설치 루프
-# =============================================================================
-
-describe "termux_env — setup_termux_gpu"
-
-_test_setup_gpu_installs_pkgs() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-    reset_mock_calls
-    MOCK_INSTALLED_PKGS=""  # 아무것도 설치 안 된 상태
-
-    setup_termux_gpu 2>/dev/null || true
-
-    # GPU 패키지 중 하나라도 pkg_install 호출됐는지 확인
-    assert_was_called "pkg_install"
-    cleanup_sandbox "$sb"
-}
-it "GPU 패키지 미설치 시 pkg_install을 호출한다" _test_setup_gpu_installs_pkgs
-
-_test_setup_gpu_skips_installed() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-    reset_mock_calls
-    # 모든 GPU 패키지를 설치된 것으로 설정
-    MOCK_INSTALLED_PKGS="${PKGS_TERMUX_GPU[*]}"
-
-    setup_termux_gpu 2>/dev/null || true
-
-    assert_not_called "pkg_install"
-    cleanup_sandbox "$sb"
-}
-it "멱등성 — GPU 패키지가 이미 설치된 경우 pkg_install을 호출하지 않는다" _test_setup_gpu_skips_installed
-
-# =============================================================================
 # _setup_tur_multilib — sed '/^deb /' 패턴 검증
 # =============================================================================
 
@@ -821,36 +787,6 @@ _test_base_pkgs_dbus_preserved_when_xfce_installed() {
 it "XFCE 설치된 idempotent 재실행에서는 dbus를 보존한다 (cascade 제거 차단)" _test_base_pkgs_dbus_preserved_when_xfce_installed
 
 # =============================================================================
-# setup_termux_gpu_dev — GPU 개발 도구 패키지 루프
-# =============================================================================
-
-describe "termux_env — setup_termux_gpu_dev"
-
-_test_gpu_dev_installs_pkgs() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-    reset_mock_calls
-    MOCK_INSTALLED_PKGS=""
-
-    setup_termux_gpu_dev 2>/dev/null || true
-    assert_was_called "pkg_install"
-    cleanup_sandbox "$sb"
-}
-it "GPU 개발 패키지 미설치 시 pkg_install을 호출한다" _test_gpu_dev_installs_pkgs
-
-_test_gpu_dev_skips_installed() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-    reset_mock_calls
-    MOCK_INSTALLED_PKGS="${PKGS_TERMUX_GPU_DEV[*]}"
-
-    setup_termux_gpu_dev 2>/dev/null || true
-    assert_not_called "pkg_install"
-    cleanup_sandbox "$sb"
-}
-it "멱등성 — GPU 개발 패키지가 이미 설치된 경우 건너뛴다" _test_gpu_dev_skips_installed
-
-# =============================================================================
 # setup_termux_shortcuts — composition 함수 검증
 # =============================================================================
 
@@ -903,41 +839,6 @@ _test_install_base_packages_completes_under_set_e() {
     cleanup_sandbox "$sb"
 }
 it "_install_base_packages가 set -e 하에서 끝까지 실행된다" _test_install_base_packages_completes_under_set_e
-
-_test_setup_termux_gpu_completes_under_set_e() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-    reset_mock_calls
-    MOCK_INSTALLED_PKGS=""
-
-    setup_termux_gpu
-
-    local install_count=0
-    for call in "${MOCK_CALLS[@]:-}"; do
-        [[ "$call" == pkg_install* ]] && install_count=$((install_count + 1))
-    done
-    [ "$install_count" -eq "${#PKGS_TERMUX_GPU[@]}" ]
-    cleanup_sandbox "$sb"
-}
-it "setup_termux_gpu가 set -e 하에서 끝까지 실행된다" _test_setup_termux_gpu_completes_under_set_e
-
-_test_setup_termux_korean_completes_under_set_e() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-    reset_mock_calls
-    MOCK_INSTALLED_PKGS=""
-
-    setup_termux_korean
-
-    local install_count=0
-    for call in "${MOCK_CALLS[@]:-}"; do
-        [[ "$call" == pkg_install* ]] && install_count=$((install_count + 1))
-    done
-    # tur-repo + 한글 패키지들
-    [ "$install_count" -ge "${#PKGS_TERMUX_KOREAN[@]}" ]
-    cleanup_sandbox "$sb"
-}
-it "setup_termux_korean이 set -e 하에서 끝까지 실행된다" _test_setup_termux_korean_completes_under_set_e
 
 # =============================================================================
 # setup_termux_x11_apk — 아키텍처 분기 + 멱등성 + 폴백
@@ -1089,6 +990,112 @@ _test_widget_no_warn_when_startxfce_present() {
     cleanup_sandbox "$sb"
 }
 it "startXFCE 단축키 존재 시 경고 안나옴" _test_widget_no_warn_when_startxfce_present
+
+# =============================================================================
+# setup_termux_api_apk — APK 다운로드 + 멱등성
+# =============================================================================
+
+describe "termux_env — setup_termux_api_apk"
+
+_test_api_apk_downloads() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "$HOME/storage/downloads"
+    termux-open() { _record_call "termux-open $*"; }
+    reset_mock_calls
+
+    setup_termux_api_apk
+
+    assert_was_called "wget"
+    assert_was_called "termux-api.apk"
+    cleanup_sandbox "$sb"
+}
+it "Termux:API APK를 다운로드한다" _test_api_apk_downloads
+
+_test_api_apk_idempotent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "$HOME/storage/downloads"
+    touch "$HOME/storage/downloads/termux-api.apk"
+    termux-open() { _record_call "termux-open $*"; }
+    reset_mock_calls
+
+    setup_termux_api_apk
+
+    assert_not_called "wget"
+    assert_was_called "termux-open"
+    cleanup_sandbox "$sb"
+}
+it "API APK가 이미 있으면 wget 건너뛰고 termux-open만 호출" _test_api_apk_idempotent
+
+# =============================================================================
+# setup_termux_float_apk — APK 다운로드 + 멱등성
+# =============================================================================
+
+describe "termux_env — setup_termux_float_apk"
+
+_test_float_apk_downloads() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "$HOME/storage/downloads"
+    termux-open() { _record_call "termux-open $*"; }
+    reset_mock_calls
+
+    setup_termux_float_apk
+
+    assert_was_called "wget"
+    assert_was_called "termux-float.apk"
+    cleanup_sandbox "$sb"
+}
+it "Termux:Float APK를 다운로드한다" _test_float_apk_downloads
+
+_test_float_apk_idempotent() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    mkdir -p "$HOME/storage/downloads"
+    touch "$HOME/storage/downloads/termux-float.apk"
+    termux-open() { _record_call "termux-open $*"; }
+    reset_mock_calls
+
+    setup_termux_float_apk
+
+    assert_not_called "wget"
+    assert_was_called "termux-open"
+    cleanup_sandbox "$sb"
+}
+it "Float APK가 이미 있으면 wget 건너뛰고 termux-open만 호출" _test_float_apk_idempotent
+
+# =============================================================================
+# _setup_clipboard_sync — 동기화 스크립트 생성
+# =============================================================================
+
+describe "termux_env — _setup_clipboard_sync"
+
+_test_clipboard_sync_creates_script() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    _setup_clipboard_sync
+
+    assert_file_exists "$PREFIX/bin/termux-clipboard-sync"
+    [ -x "$PREFIX/bin/termux-clipboard-sync" ]
+    cleanup_sandbox "$sb"
+}
+it "termux-clipboard-sync 스크립트를 생성하고 실행 권한을 부여한다" _test_clipboard_sync_creates_script
+
+_test_clipboard_sync_contains_sync_logic() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+
+    _setup_clipboard_sync
+
+    local bin="$PREFIX/bin/termux-clipboard-sync"
+    grep -q 'termux-clipboard-get' "$bin"
+    grep -q 'xclip -selection clipboard' "$bin"
+    grep -q 'termux-clipboard-set' "$bin"
+    cleanup_sandbox "$sb"
+}
+it "동기화 스크립트에 양방향 클립보드 로직이 포함된다" _test_clipboard_sync_contains_sync_logic
 
 # =============================================================================
 # _setup_termux_repos — 3개 repo + pkg_update

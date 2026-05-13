@@ -35,19 +35,16 @@ setup_xfce_fonts()        { _trace "setup_xfce_fonts"; }
 setup_xfce_wallpaper()    { _trace "setup_xfce_wallpaper"; }
 setup_xfce_fancybash()    { _trace "setup_xfce_fancybash $*"; }
 setup_xfce_autostart()    { _trace "setup_xfce_autostart"; }
-setup_termux_korean()     { _trace "setup_termux_korean"; }
 setup_termux_shortcuts()  { _trace "setup_termux_shortcuts"; }
-setup_termux_gpu()        { _trace "setup_termux_gpu"; }
-setup_termux_gpu_dev()    { _trace "setup_termux_gpu_dev"; }
 setup_termux_x11_apk()    { _trace "setup_termux_x11_apk"; }
-setup_korean_locale_native() { _trace "setup_korean_locale_native"; }
+setup_termux_api_apk()    { _trace "setup_termux_api_apk"; }
+setup_termux_float_apk()  { _trace "setup_termux_float_apk"; }
 
 # proot setup
 setup_proot_install()         { _trace "setup_proot_install"; }
 setup_proot_update()          { _trace "setup_proot_update"; }
 setup_proot_user()            { _trace "setup_proot_user"; }
 setup_proot_base_packages()   { _trace "setup_proot_base_packages"; }
-setup_proot_korean()          { _trace "setup_proot_korean"; }
 setup_proot_env()             { _trace "setup_proot_env"; }
 setup_proot_timezone()        { _trace "setup_proot_timezone"; }
 setup_proot_fancybash()       { _trace "setup_proot_fancybash"; }
@@ -120,44 +117,17 @@ _write_hook_file
 describe "matrix — Termux native만 (--no-proot)"
 
 _test_minimal_native() {
-    _run_install --no-proot --no-gpu --no-korean
+    _run_install --no-proot
     _assert_traced "setup_termux_base"
     _assert_traced "setup_xfce_packages"
     _assert_traced "setup_xfce_autostart"
     _assert_traced "setup_termux_shortcuts"
     _assert_traced "setup_termux_x11_apk"
-    _assert_not_traced "setup_termux_gpu"
-    _assert_not_traced "setup_termux_korean"
+    _assert_traced "setup_termux_api_apk"
+    _assert_traced "setup_termux_float_apk"
     _assert_not_traced "setup_proot_install"
 }
-it "최소 native (no-gpu, no-korean) — proot/gpu/korean 호출 없음" _test_minimal_native
-
-_test_native_with_gpu() {
-    _run_install --no-proot --gpu --no-gpu-dev --no-korean
-    _assert_traced "setup_termux_gpu"
-    _assert_not_traced "setup_termux_gpu_dev"
-    _assert_not_traced "setup_proot_install"
-}
-it "native + GPU — gpu만 호출, gpu_dev 없음" _test_native_with_gpu
-
-_test_native_with_gpu_dev() {
-    _run_install --no-proot --gpu --gpu-dev --no-korean
-    _assert_traced "setup_termux_gpu"
-    _assert_traced "setup_termux_gpu_dev"
-}
-it "native + GPU + gpu-dev — 둘 다 호출" _test_native_with_gpu_dev
-
-_test_native_with_korean() {
-    _run_install --no-proot --no-gpu --korean
-    _assert_traced "setup_termux_korean"
-}
-it "native + 한글 입력기 — setup_termux_korean 호출" _test_native_with_korean
-
-_test_native_with_korean_locale() {
-    _run_install --no-proot --no-gpu --no-korean --korean-locale
-    _assert_traced "setup_korean_locale_native"
-}
-it "native + --korean-locale — setup_korean_locale_native 호출" _test_native_with_korean_locale
+it "최소 native (no-proot) — companion APK 포함, proot 없음" _test_minimal_native
 
 # =============================================================================
 # 매트릭스 2: --proot-only (proot만, native 생략)
@@ -166,18 +136,20 @@ it "native + --korean-locale — setup_korean_locale_native 호출" _test_native
 describe "matrix — proot-only (--proot-only)"
 
 _test_proot_only_ubuntu() {
-    _run_install --proot-only --distro ubuntu --user testuser --no-gpu --no-korean
+    _run_install --proot-only --distro ubuntu --user testuser
     _assert_not_traced "setup_termux_base"
     _assert_not_traced "setup_xfce_packages"
     _assert_not_traced "setup_termux_x11_apk"
+    _assert_not_traced "setup_termux_api_apk"
+    _assert_not_traced "setup_termux_float_apk"
     _assert_traced "setup_proot_install"
     _assert_traced "setup_proot_user"
     _assert_traced "setup_proot_alias"
 }
-it "Ubuntu proot-only — native 모두 생략, proot만 실행" _test_proot_only_ubuntu
+it "Ubuntu proot-only — native+companion APK 모두 생략, proot만 실행" _test_proot_only_ubuntu
 
 _test_proot_only_archlinux() {
-    _run_install --proot-only --distro archlinux --user testuser --no-gpu --no-korean
+    _run_install --proot-only --distro archlinux --user testuser
     _assert_not_traced "setup_termux_base"
     _assert_traced "setup_proot_install"
     _assert_traced "setup_proot_alias"
@@ -191,38 +163,22 @@ it "Arch proot-only — native 모두 생략, proot만 실행" _test_proot_only_
 describe "matrix — 풀 설치 (native + proot)"
 
 _test_full_ubuntu() {
-    _run_install --distro ubuntu --user testuser --gpu --no-gpu-dev --no-korean
+    _run_install --distro ubuntu --user testuser
     _assert_traced "setup_termux_base"
-    _assert_traced "setup_termux_gpu"
     _assert_traced "setup_proot_install"
     _assert_traced "setup_proot_base_packages"
     _assert_traced "setup_proot_alias"
     _assert_traced "setup_termux_x11_apk"
-    _assert_not_traced "setup_proot_korean"
 }
-it "Ubuntu 풀 + GPU + no-korean — proot_korean 생략" _test_full_ubuntu
+it "Ubuntu 풀 — native + proot 모두 실행" _test_full_ubuntu
 
-_test_full_arch_korean() {
-    _run_install --distro archlinux --user testuser --no-gpu --korean
+_test_full_arch() {
+    _run_install --distro archlinux --user testuser
     _assert_traced "setup_termux_base"
-    _assert_traced "setup_termux_korean"
     _assert_traced "setup_proot_install"
-    _assert_traced "setup_proot_korean"
     _assert_traced "setup_proot_alias"
 }
-it "Arch 풀 + 한글 — native+proot 양쪽 한글 설정" _test_full_arch_korean
-
-_test_full_ubuntu_all_options() {
-    _run_install --distro ubuntu --user testuser --gpu --gpu-dev --korean --korean-locale
-    _assert_traced "setup_termux_base"
-    _assert_traced "setup_termux_gpu"
-    _assert_traced "setup_termux_gpu_dev"
-    _assert_traced "setup_termux_korean"
-    _assert_traced "setup_korean_locale_native"
-    _assert_traced "setup_proot_install"
-    _assert_traced "setup_proot_korean"
-}
-it "Ubuntu 풀 + 모든 옵션 — 모든 setup_* 호출" _test_full_ubuntu_all_options
+it "Arch 풀 — native + proot 모두 실행" _test_full_arch
 
 # =============================================================================
 # 매트릭스 4: 환경변수 기반 (CLI 인자 대신)
@@ -231,22 +187,18 @@ it "Ubuntu 풀 + 모든 옵션 — 모든 setup_* 호출" _test_full_ubuntu_all_
 describe "matrix — 환경변수 기반 호출"
 
 _test_env_vars_no_proot() {
-    SKIP_PROOT=true SKIP_KOREAN=true INSTALL_GPU=false _run_install
+    SKIP_PROOT=true _run_install
     _assert_traced "setup_termux_base"
     _assert_not_traced "setup_proot_install"
-    _assert_not_traced "setup_termux_korean"
-    _assert_not_traced "setup_termux_gpu"
 }
-it "SKIP_PROOT=true SKIP_KOREAN=true INSTALL_GPU=false" _test_env_vars_no_proot
+it "SKIP_PROOT=true — proot 생략" _test_env_vars_no_proot
 
 _test_env_vars_full() {
-    DISTRO=ubuntu USERNAME=testuser INSTALL_GPU=true INSTALL_GPU_DEV=false \
-        SKIP_KOREAN=true _run_install
+    DISTRO=ubuntu USERNAME=testuser _run_install
     _assert_traced "setup_termux_base"
-    _assert_traced "setup_termux_gpu"
     _assert_traced "setup_proot_install"
 }
-it "DISTRO=ubuntu USERNAME=testuser INSTALL_GPU=true" _test_env_vars_full
+it "DISTRO=ubuntu USERNAME=testuser — 풀 설치" _test_env_vars_full
 
 # =============================================================================
 # 매트릭스 5: --help / 잘못된 인자
@@ -281,7 +233,7 @@ _test_invalid_distro_exits_nonzero() {
     local rc=0
     _INSTALL_HOOK="$HOOK_FILE" _TRACE_FILE="$TRACE_FILE" \
     HOME="$(mktemp -d)" PREFIX="$(mktemp -d)" \
-        bash "$REPO_ROOT/install.sh" --distro freebsd --user testuser --no-gpu --no-gpu-dev --no-korean \
+        bash "$REPO_ROOT/install.sh" --distro freebsd --user testuser \
         >/dev/null 2>&1 || rc=$?
     if [ "$rc" -eq 0 ]; then
         echo "[ASSERT] invalid distro should exit non-zero, got 0" >&2
@@ -300,7 +252,7 @@ _test_config_file_records_distro() {
     local sandbox; sandbox=$(mktemp -d)
     HOME="$sandbox/home" PREFIX="$sandbox/usr" \
     _TRACE_FILE="$TRACE_FILE" _INSTALL_HOOK="$HOOK_FILE" \
-        bash "$REPO_ROOT/install.sh" --distro ubuntu --user lideok --no-gpu --no-korean \
+        bash "$REPO_ROOT/install.sh" --distro ubuntu --user lideok \
         >/dev/null 2>&1
 
     local cfg="$sandbox/home/.config/termux-xfce/config"
@@ -315,7 +267,7 @@ _test_config_file_no_distro_when_no_proot() {
     local sandbox; sandbox=$(mktemp -d)
     HOME="$sandbox/home" PREFIX="$sandbox/usr" \
     _TRACE_FILE="$TRACE_FILE" _INSTALL_HOOK="$HOOK_FILE" \
-        bash "$REPO_ROOT/install.sh" --no-proot --no-gpu --no-korean \
+        bash "$REPO_ROOT/install.sh" --no-proot \
         >/dev/null 2>&1
 
     local cfg="$sandbox/home/.config/termux-xfce/config"

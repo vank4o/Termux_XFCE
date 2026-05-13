@@ -8,9 +8,7 @@
 #   - SKIP_PROOT=false + PROOT_DISTRO 미설정 → ui_select 호출
 #   - distro_choice "없음 (Termux native만)" → SKIP_PROOT=true
 #   - SKIP_PROOT=true → distro 질문 건너뜀
-#   - SKIP_KOREAN/INSTALL_GPU 미설정 → ui_confirm 호출
-#   - INSTALL_GPU=true → INSTALL_GPU_DEV 질문
-#   - INSTALL_GPU=false → INSTALL_GPU_DEV 질문 안함
+#   GPU/한글 입력기는 app-installer로 이관됨 (base install에서 제거)
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -63,7 +61,7 @@ _assert_ui_not_called() {
 }
 
 _unset_inputs() {
-    unset PROOT_USER PROOT_DISTRO SKIP_PROOT SKIP_KOREAN INSTALL_GPU INSTALL_GPU_DEV
+    unset PROOT_USER PROOT_DISTRO SKIP_PROOT
 }
 
 # =============================================================================
@@ -98,7 +96,7 @@ _test_distro_prompted_when_unset() {
     _unset_inputs
     _setup_controllable_ui
     UI_SELECT_RESPONSE="archlinux"
-    export PROOT_USER="x" SKIP_KOREAN=true INSTALL_GPU=false
+    export PROOT_USER="x"
     source "$ADAPTER"
     resolve_interactive_inputs
     assert_eq "archlinux" "$PROOT_DISTRO"
@@ -110,7 +108,7 @@ _test_distro_none_choice_sets_skip_proot() {
     _unset_inputs
     _setup_controllable_ui
     UI_SELECT_RESPONSE="없음 (Termux native만)"
-    export PROOT_USER="x" SKIP_KOREAN=true INSTALL_GPU=false
+    export PROOT_USER="x"
     source "$ADAPTER"
     resolve_interactive_inputs
     assert_eq "true" "$SKIP_PROOT"
@@ -121,60 +119,11 @@ it "'없음' 선택 시 SKIP_PROOT=true, PROOT_DISTRO 빈값" _test_distro_none_
 _test_distro_skipped_when_skip_proot_true() {
     _unset_inputs
     _setup_controllable_ui
-    export PROOT_USER="x" SKIP_PROOT=true SKIP_KOREAN=true INSTALL_GPU=false
+    export PROOT_USER="x" SKIP_PROOT=true
     source "$ADAPTER"
     resolve_interactive_inputs
     _assert_ui_not_called "select:proot-distro"
 }
 it "SKIP_PROOT=true 면 distro 질문 건너뜀" _test_distro_skipped_when_skip_proot_true
-
-# =============================================================================
-describe "interactive — resolve_interactive_inputs SKIP_KOREAN/INSTALL_GPU"
-
-_test_korean_prompted_when_unset() {
-    _unset_inputs
-    _setup_controllable_ui
-    UI_CONFIRM_RESPONSE=0  # Yes
-    export PROOT_USER="x" SKIP_PROOT=true INSTALL_GPU=false
-    source "$ADAPTER"
-    resolve_interactive_inputs
-    assert_eq "false" "$SKIP_KOREAN"
-    _assert_ui_called "confirm:한글 입력기"
-}
-it "SKIP_KOREAN 미설정 + Yes 응답 시 SKIP_KOREAN=false" _test_korean_prompted_when_unset
-
-_test_korean_no_response() {
-    _unset_inputs
-    _setup_controllable_ui
-    UI_CONFIRM_RESPONSE=1  # No
-    export PROOT_USER="x" SKIP_PROOT=true INSTALL_GPU=false
-    source "$ADAPTER"
-    resolve_interactive_inputs
-    assert_eq "true" "$SKIP_KOREAN"
-}
-it "SKIP_KOREAN 미설정 + No 응답 시 SKIP_KOREAN=true" _test_korean_no_response
-
-_test_gpu_dev_skipped_when_gpu_false() {
-    _unset_inputs
-    _setup_controllable_ui
-    export PROOT_USER="x" SKIP_PROOT=true SKIP_KOREAN=true INSTALL_GPU=false
-    source "$ADAPTER"
-    resolve_interactive_inputs
-    _assert_ui_not_called "confirm:GPU 개발 도구"
-    [ -z "${INSTALL_GPU_DEV:-}" ]
-}
-it "INSTALL_GPU=false 시 GPU_DEV 질문 건너뜀" _test_gpu_dev_skipped_when_gpu_false
-
-_test_gpu_dev_prompted_when_gpu_true() {
-    _unset_inputs
-    _setup_controllable_ui
-    UI_CONFIRM_RESPONSE=0
-    export PROOT_USER="x" SKIP_PROOT=true SKIP_KOREAN=true INSTALL_GPU=true
-    source "$ADAPTER"
-    resolve_interactive_inputs
-    _assert_ui_called "confirm:GPU 개발 도구"
-    assert_eq "true" "$INSTALL_GPU_DEV"
-}
-it "INSTALL_GPU=true 시 GPU_DEV 질문 + Yes 응답 반영" _test_gpu_dev_prompted_when_gpu_true
 
 print_results

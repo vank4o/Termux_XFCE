@@ -139,6 +139,12 @@ if [ -f "$_PREFIX/lib/force_gettext.so" ]; then
       export LD_PRELOAD="$_PREFIX/lib/force_gettext.so${LD_PRELOAD:+:$LD_PRELOAD}";; esac
 fi
 
+# Android ↔ X11 클립보드 동기화
+if command -v termux-clipboard-get >/dev/null 2>&1 && command -v xclip >/dev/null 2>&1; then
+    pkill -f termux-clipboard-sync 2>/dev/null || true
+    DISPLAY="$XDISPLAY" termux-clipboard-sync &
+fi
+
 GPU_MODEL=$(cat /sys/class/kgsl/kgsl-3d0/gpu_model 2>/dev/null || echo "")
 
 if [ -n "$GPU_MODEL" ]; then
