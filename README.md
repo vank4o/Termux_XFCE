@@ -189,25 +189,25 @@ app-installer wine     # Wine 앱만
 ## 테스트
 
 ```bash
-bash tests/run_tests.sh              # 전체 330개
+bash tests/run_tests.sh              # 전체 343개
 bash tests/run_tests.sh domain_termux
 bash tests/run_tests.sh e2e_install
 ```
 
 | 스위트 | 수 | 내용 |
 |--------|---|------|
-| ports | 7 | 어댑터 계약 준수 |
-| adapters | 24 | pkg_termux, ui_terminal, script_builder_zenity |
-| domain_termux | 55 | termux_env 로직 (API APK, 클립보드 동기화 포함) |
-| domain_xfce | 34 | xfce_env + 마이그레이션 |
-| domain_proot | 58 | proot_env (Ubuntu/Arch) |
-| domain_locale_ko | 18 | 한글 로케일 |
-| input_interactive | 8 | 대화형 입력 |
-| install_matrix | 14 | 설치 조합 매트릭스 |
-| app_installer | 103 | app-installer 검증 |
+| ports | 8 | 어댑터 계약 준수 |
+| adapters | 25 | pkg_termux, ui_terminal, script_builder_zenity |
+| domain_termux | 67 | termux_env 로직 (API APK, 클립보드 동기화 포함) |
+| domain_xfce | 39 | xfce_env + 마이그레이션 |
+| domain_proot | 62 | proot_env (Ubuntu/Arch) |
+| domain_locale_ko | 24 | 한글 로케일 |
+| input_interactive | 5 | 대화형 입력 |
+| install_matrix | 12 | 설치 조합 매트릭스 |
+| app_installer | 56 | app-installer 검증 |
 | prun_ld_preload | 17 | prun / LD_PRELOAD 회귀 |
 | e2e_install | 28 | E2E 통합 & 회귀 |
-| **합계** | **330+** | **실기기 전체 통과** |
+| **합계** | **343+** | **실기기 전체 통과** |
 
 ## Android 시스템 최적화
 

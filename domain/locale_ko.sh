@@ -21,13 +21,13 @@ vlc kdenlive kxmlgui6 kwidgetsaddons6 kconfigwidgets6 kcoreaddons6 \
 kitemviews6 kiconthemes6 kio6 sonnet6 knewstuff6 ktextwidgets6 \
 knotifications6 kservice6 solid6 kguiaddons6 kcolorscheme6"
 
-# 옵트인: install.sh가 --korean-locale 플래그나 KOREAN_LOCALE=true 시에만 호출
+# 옵트인: app-installer 또는 KOREAN_LOCALE_ZIP 환경변수로 호출
 setup_korean_locale_native() {
     local locale_zip="${KOREAN_LOCALE_ZIP:-}"
 
     if [ -z "$locale_zip" ] || [ ! -f "$locale_zip" ]; then
         ui_warn "한글 로케일을 건너뜁니다 — KOREAN_LOCALE_ZIP 경로가 유효하지 않습니다."
-        ui_warn "사용법: KOREAN_LOCALE_ZIP=/path/to/locale.zip bash install.sh --korean-locale"
+        ui_warn "사용법: KOREAN_LOCALE_ZIP=/path/to/locale.zip bash install.sh"
         return 0
     fi
 

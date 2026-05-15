@@ -9,17 +9,19 @@
 pkg_update() {
     # 일부 미러 fetch 실패(exit 100)는 캐시된 인덱스로 계속 진행 가능 — 관대 처리.
     # Why: tur.kcubeterm.com 등 외부 미러 동기화 지연이 전체 설치를 중단시키는 일을 방지.
-    local out exit_code
-    out=$(pkg update -y -o Dpkg::Options::="--force-confold" 2>&1)
-    exit_code=$?
-    printf '%s\n' "$out"
+    local tmplog exit_code
+    tmplog=$(mktemp)
+    pkg update -y -o Dpkg::Options::="--force-confold" 2>&1 | tee "$tmplog"
+    exit_code=${PIPESTATUS[0]}
     if [ $exit_code -ne 0 ]; then
-        if printf '%s' "$out" | grep -q "Some index files failed to download" && \
-           ! printf '%s' "$out" | grep -qE "Could not get lock|Unable to lock|dpkg was interrupted"; then
+        if grep -q "Some index files failed to download" "$tmplog" && \
+           ! grep -qE "Could not get lock|Unable to lock|dpkg was interrupted" "$tmplog"; then
             echo "[WARN] pkg_update: 일부 미러 동기화 실패 — 캐시된 인덱스로 계속 진행" >&2
+            rm -f "$tmplog"
             return 0
         fi
     fi
+    rm -f "$tmplog"
     return $exit_code
 }
 

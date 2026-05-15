@@ -39,6 +39,31 @@ setup_termux_shortcuts() {
     _setup_clipboard_sync
 }
 
+_download_and_open_apk() {
+    local apk_url="$1" apk_filename="$2"
+    local dl_dir="$HOME/storage/downloads"
+    local apk_path="${dl_dir}/${apk_filename}"
+
+    if [ ! -d "$dl_dir" ]; then
+        dl_dir="$HOME"
+        apk_path="${dl_dir}/${apk_filename}"
+        ui_warn "storage/downloads 없음 — ${apk_path} 에 저장합니다."
+    fi
+
+    if [ -f "$apk_path" ]; then
+        ui_warn "APK가 이미 다운로드되어 있습니다: ${apk_path}"
+    else
+        if ! wget -q "$apk_url" -O "$apk_path"; then
+            rm -f "$apk_path"
+            ui_warn "APK 다운로드 실패: ${apk_url}"
+            return 0
+        fi
+    fi
+
+    termux-open "$apk_path" 2>/dev/null || \
+        ui_warn "APK 자동 열기 실패 — 수동으로 설치하세요: ${apk_path}"
+}
+
 setup_termux_x11_apk() {
     local arch
     arch=$(uname -m)
@@ -53,65 +78,21 @@ setup_termux_x11_apk() {
             ;;
     esac
 
-    local apk_url="https://github.com/termux/termux-x11/releases/download/nightly/${apk_name}"
-    local dl_dir="$HOME/storage/downloads"
-    local apk_path="${dl_dir}/${apk_name}"
-
-    # storage/downloads가 없으면 HOME에 저장 (termux-setup-storage 미실행 환경)
-    if [ ! -d "$dl_dir" ]; then
-        dl_dir="$HOME"
-        apk_path="${dl_dir}/${apk_name}"
-        ui_warn "storage/downloads 없음 — ${apk_path} 에 저장합니다."
-    fi
-
-    if [ -f "$apk_path" ]; then
-        ui_warn "APK가 이미 다운로드되어 있습니다: ${apk_path}"
-    else
-        wget -q "$apk_url" -O "$apk_path"
-    fi
-
-    termux-open "$apk_path" 2>/dev/null || \
-        ui_warn "APK 자동 열기 실패 — 수동으로 설치하세요: ${apk_path}"
+    _download_and_open_apk \
+        "https://github.com/termux/termux-x11/releases/download/nightly/${apk_name}" \
+        "$apk_name"
 }
 
 setup_termux_api_apk() {
-    local apk_url='https://github.com/termux/termux-api/releases/download/v0.53.0/termux-api-app_v0.53.0+github.debug.apk'
-    local dl_dir="$HOME/storage/downloads"
-    local apk_path="${dl_dir}/termux-api.apk"
-
-    if [ ! -d "$dl_dir" ]; then
-        dl_dir="$HOME"
-        apk_path="${dl_dir}/termux-api.apk"
-    fi
-
-    if [ -f "$apk_path" ]; then
-        ui_warn "Termux:API APK가 이미 다운로드되어 있습니다: ${apk_path}"
-    else
-        wget -q "$apk_url" -O "$apk_path"
-    fi
-
-    termux-open "$apk_path" 2>/dev/null || \
-        ui_warn "APK 자동 열기 실패 — 수동으로 설치하세요: ${apk_path}"
+    _download_and_open_apk \
+        'https://github.com/termux/termux-api/releases/download/v0.53.0/termux-api-app_v0.53.0+github.debug.apk' \
+        'termux-api.apk'
 }
 
 setup_termux_float_apk() {
-    local apk_url='https://github.com/termux/termux-float/releases/download/v0.17.0/termux-float-app_v0.17.0+github.debug.apk'
-    local dl_dir="$HOME/storage/downloads"
-    local apk_path="${dl_dir}/termux-float.apk"
-
-    if [ ! -d "$dl_dir" ]; then
-        dl_dir="$HOME"
-        apk_path="${dl_dir}/termux-float.apk"
-    fi
-
-    if [ -f "$apk_path" ]; then
-        ui_warn "Termux:Float APK가 이미 다운로드되어 있습니다: ${apk_path}"
-    else
-        wget -q "$apk_url" -O "$apk_path"
-    fi
-
-    termux-open "$apk_path" 2>/dev/null || \
-        ui_warn "APK 자동 열기 실패 — 수동으로 설치하세요: ${apk_path}"
+    _download_and_open_apk \
+        'https://github.com/termux/termux-float/releases/download/v0.17.0/termux-float-app_v0.17.0+github.debug.apk' \
+        'termux-float.apk'
 }
 
 setup_termux_widget() {
@@ -717,10 +698,8 @@ while true; do
     X11=$(DISPLAY="${DISPLAY:-:0}" xclip -selection clipboard -o 2>/dev/null) || continue
     if [ "$ANDROID" != "$PREV_ANDROID" ] && [ "$ANDROID" != "$X11" ]; then
         printf '%s' "$ANDROID" | DISPLAY="${DISPLAY:-:0}" xclip -selection clipboard -i 2>/dev/null
-        PREV_X11="$ANDROID"
     elif [ "$X11" != "$PREV_X11" ] && [ "$X11" != "$ANDROID" ]; then
         termux-clipboard-set "$X11" 2>/dev/null
-        PREV_ANDROID="$X11"
     fi
     PREV_ANDROID="$ANDROID" PREV_X11="$X11"
 done
