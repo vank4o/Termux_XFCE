@@ -12,6 +12,8 @@ WhiteSur-Light/
 
 # 테스트 로그
 tests/install_logs/
+tests/autopilot.log
+tests/result_*.log
 
 # 기타
 *.deb
