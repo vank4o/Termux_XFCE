@@ -327,11 +327,46 @@ it "wine.sh — proot/native 양쪽 wrapper 모두 DPI 지원" _test_wine_dpi_in
 
 describe "Wine 앱 installer — 구조 검증"
 
-# kakaotalk/notepadpp/sevenzip은 APP_REGISTRY에 등록되어 있으나 installer 미구현 (submodule TODO)
-# 구현되면 아래 skip을 제거하고 활성화
-skip "모든 Wine 앱 — Wine 설치 여부 체크 있음 (kakaotalk/notepadpp/sevenzip 미구현)"
-skip "모든 Wine 앱 — .desktop 파일 생성 로직 있음 (kakaotalk/notepadpp/sevenzip 미구현)"
-skip "모든 Wine 앱 — desktop Exec에 wine 명령 사용 (kakaotalk/notepadpp/sevenzip 미구현)"
+_test_wine_apps_have_wine_check() {
+    local failed=0
+    for id in kakaotalk notepadpp sevenzip sumatrapdf winmerge; do
+        local f="${INSTALLERS_DIR}/${id}.sh"
+        if [ ! -f "$f" ]; then
+            echo "[ASSERT] ${id}.sh 파일 없음" >&2; failed=1; continue
+        fi
+        if ! command grep -q "app_is_installed_wine" "$f"; then
+            echo "[ASSERT] ${id}.sh에 Wine 설치 확인 없음" >&2; failed=1
+        fi
+    done
+    return "$failed"
+}
+it "모든 Wine 앱 — Wine 설치 여부 체크 있음" _test_wine_apps_have_wine_check
+
+_test_wine_apps_have_desktop_logic() {
+    local failed=0
+    for id in kakaotalk notepadpp sevenzip sumatrapdf winmerge; do
+        local f="${INSTALLERS_DIR}/${id}.sh"
+        [ -f "$f" ] || continue
+        if ! command grep -q "desktop\|\.desktop" "$f"; then
+            echo "[ASSERT] ${id}.sh에 desktop 파일 생성 로직 없음" >&2; failed=1
+        fi
+    done
+    return "$failed"
+}
+it "모든 Wine 앱 — .desktop 파일 생성 로직 있음" _test_wine_apps_have_desktop_logic
+
+_test_wine_apps_use_wine_in_exec() {
+    local failed=0
+    for id in kakaotalk notepadpp sevenzip sumatrapdf winmerge; do
+        local f="${INSTALLERS_DIR}/${id}.sh"
+        [ -f "$f" ] || continue
+        if ! command grep -q "wine" "$f"; then
+            echo "[ASSERT] ${id}.sh에 wine 명령 없음" >&2; failed=1
+        fi
+    done
+    return "$failed"
+}
+it "모든 Wine 앱 — desktop Exec에 wine 명령 사용" _test_wine_apps_use_wine_in_exec
 
 # =============================================================================
 # 모든 installer 스크립트 문법 검사
