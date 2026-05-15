@@ -12,6 +12,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 AI_DIR="${SCRIPT_DIR}/app-installer"
 LOG="${SCRIPT_DIR}/tests/result_${DISTRO}.log"
 
+# proot 앱 desktop 파일은 termux 호스트($PREFIX/share/applications)에 공유되므로,
+# 한 호스트에서 distro별로 batch를 돌리면 다른 distro의 흔적 때문에 SKIP 처리됨.
+# PROOT_FRESH=1로 시작 시 proot 앱 desktop 흔적을 제거 → 현 distro에서 진짜 재설치 검증.
+PROOT_FRESH="${PROOT_FRESH:-0}"
+
 export PROOT_DISTRO="$DISTRO"
 export PROOT_USER="$USER"
 
@@ -66,6 +71,15 @@ echo "--- 설치 테스트 ---" | tee -a "$LOG"
 PROOT_APPS=(libreoffice miniforge nautilus dbeaver)
 HEAVY_APPS=(tor_browser notion teams thorium sasm)
 NATIVE_APPS=(thunderbird vlc vscode burpsuite)
+
+# PROOT_FRESH=1: 현 distro에서 진짜 재설치 검증 위해 호스트 공유 desktop 흔적 제거
+if [ "$PROOT_FRESH" = "1" ]; then
+    echo "▶ PROOT_FRESH=1: proot 앱 desktop 흔적 정리 (호스트 공유 정리)" | tee -a "$LOG"
+    for id in "${PROOT_APPS[@]}"; do
+        desktop_remove_prefix "$id"
+        echo "  - $id 흔적 제거" | tee -a "$LOG"
+    done
+fi
 
 echo "▶ Native (Termux) 앱" | tee -a "$LOG"
 for id in "${NATIVE_APPS[@]}"; do run_test "$id"; done
