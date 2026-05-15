@@ -124,6 +124,27 @@ LD_PRELOAD=/system/lib64/libskcodec.so pulseaudio --start \
 LD_PRELOAD=/system/lib64/libskcodec.so pacmd load-module \
     module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1 2>/dev/null || true
 
+# 한글 로케일 — force_gettext.so가 설치되어 있으면 자동 적용
+_PREFIX="/data/data/com.termux/files/usr"
+if [ -f "$_PREFIX/lib/force_gettext.so" ]; then
+    export LANG="ko_KR.UTF-8"
+    export LANGUAGE="ko_KR:ko:en_US:en"
+    export FORCE_TEXTDOMAINDIR="$_PREFIX/share/locale"
+    export FALLBACK_DOMAINS="__KOREAN_FALLBACK_DOMAINS__"
+    export XDG_DATA_DIRS="$_PREFIX/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
+    QT_TRANSLATIONS_PATH="$_PREFIX/share/qt6/translations:$_PREFIX/share/qt/translations${QT_TRANSLATIONS_PATH:+:$QT_TRANSLATIONS_PATH}"
+    export QT_TRANSLATIONS_PATH
+    export KDE_LANG=ko QT_LOCALE_OVERRIDE=ko_KR
+    case ":${LD_PRELOAD-}:" in *:"$_PREFIX/lib/force_gettext.so":*) ;; *)
+      export LD_PRELOAD="$_PREFIX/lib/force_gettext.so${LD_PRELOAD:+:$LD_PRELOAD}";; esac
+fi
+
+# Android ↔ X11 클립보드 동기화
+if command -v termux-clipboard-get >/dev/null 2>&1 && command -v xclip >/dev/null 2>&1; then
+    pkill -f termux-clipboard-sync 2>/dev/null || true
+    DISPLAY="$XDISPLAY" termux-clipboard-sync &
+fi
+
 GPU_MODEL=$(cat /sys/class/kgsl/kgsl-3d0/gpu_model 2>/dev/null || echo "")
 
 if [ -n "$GPU_MODEL" ]; then
@@ -153,6 +174,7 @@ else
         dbus-launch --exit-with-session xfce4-session &
 fi
 EOF
+    sed -i "s|__KOREAN_FALLBACK_DOMAINS__|${_KOREAN_FALLBACK_DOMAINS:-}|" "$output"
 }
 
 script_build_kill_x11() {

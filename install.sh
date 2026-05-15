@@ -161,10 +161,8 @@ fi
 # -----------------------------------------------------------------------------
 # 단계 카운터 — 선택 옵션에 따라 총 단계 수 계산
 _step=0
-_total=4  # 기본: base + xfce + shortcuts + x11apk
-[ "${SKIP_KOREAN:-true}" != "true" ] && _total=$((_total + 1))
-[ "${INSTALL_GPU:-false}" = "true" ] && _total=$((_total + 1))
-[ "${SKIP_PROOT:-true}" != "true" ] && [ -n "${PROOT_DISTRO:-}" ] && _total=$((_total + 1))
+_total=5  # 기본: base + xfce + shortcuts + x11apk + companion-apks
+[ "${SKIP_PROOT:-false}" != "true" ] && [ -n "${PROOT_DISTRO:-}" ] && _total=$((_total + 1))
 _step_msg() { _step=$((_step + 1)); ui_info "=== [${_step}/${_total}] $1 ==="; }
 
 if [ "${PROOT_ONLY:-false}" != "true" ]; then
@@ -188,30 +186,9 @@ if [ "${PROOT_ONLY:-false}" != "true" ]; then
     ui_info "  자동시작 설정..."
     setup_xfce_autostart
 
-    # 한글 로케일(LD_PRELOAD 기반) — 옵트인
-    if [ "${KOREAN_LOCALE:-false}" = "true" ]; then
-        ui_info "  한글 로케일 강제 적용..."
-        setup_korean_locale_native
-    fi
-
-    # 한글 입력기 (선택)
-    if [ "${SKIP_KOREAN:-true}" != "true" ]; then
-        _step_msg "한글 입력기(fcitx5) 설치"
-        setup_termux_korean
-    fi
-
     _step_msg "유틸리티 설정 (shortcuts, prun, cp2menu)"
     setup_termux_shortcuts
 
-    # GPU 가속 (선택)
-    if [ "${INSTALL_GPU:-false}" = "true" ]; then
-        _step_msg "GPU 가속(mesa, Turnip) 설치"
-        setup_termux_gpu
-        if [ "${INSTALL_GPU_DEV:-false}" = "true" ]; then
-            ui_info "  GPU 개발 도구 설치..."
-            setup_termux_gpu_dev
-        fi
-    fi
 else
     ui_info "[--proot-only] Termux native 설정 생략 — proot 환경만 구성합니다."
 fi
@@ -230,10 +207,6 @@ if [ "${SKIP_PROOT:-false}" != "true" ] && [ -n "${PROOT_DISTRO:-}" ]; then
     setup_proot_user
     ui_info "  기본 패키지 설치..."
     setup_proot_base_packages
-    if [ "${SKIP_KOREAN:-true}" != "true" ]; then
-        ui_info "  한글 환경 설정..."
-        setup_proot_korean
-    fi
     ui_info "  환경변수 설정..."
     setup_proot_env
     setup_proot_timezone
@@ -252,6 +225,10 @@ fi
 if [ "${PROOT_ONLY:-false}" != "true" ]; then
     _step_msg "Termux-X11 APK 설치"
     setup_termux_x11_apk
+
+    _step_msg "Termux 컴패니언 APK 설치 (API, Float)"
+    setup_termux_api_apk
+    setup_termux_float_apk
 fi
 
 # -----------------------------------------------------------------------------
@@ -265,6 +242,9 @@ if [ -n "${PROOT_DISTRO:-}" ]; then
     ui_info "proot 진입: ${PROOT_DISTRO} (또는 prun <명령>)"
 fi
 ui_info "앱 설치: app-installer"
+ui_info "클립보드 동기화: XFCE 시작 시 자동 실행 (Android↔X11)"
+ui_info ""
+ui_info "⚠ Termux:API, Termux:Float APK를 설치 화면에서 확인하세요"
 ui_info "=================================================="
 
 termux-reload-settings

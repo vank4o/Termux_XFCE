@@ -9,13 +9,25 @@
 #   (3) startxfce4-ko 래퍼 — 환경변수 + LD_PRELOAD 주입 후 startxfce4 exec
 # =============================================================================
 
-# 옵트인: install.sh가 --korean-locale 플래그나 KOREAN_LOCALE=true 시에만 호출
+# FALLBACK_DOMAINS — force_gettext.so가 후킹할 gettext 도메인 목록
+# setup_korean_rc (termux_env.sh), script_builder_zenity.sh에서도 참조
+readonly _KOREAN_FALLBACK_DOMAINS="\
+mousepad xfce4-terminal thunar ristretto \
+gtk30 glib20 gdk-pixbuf libxfce4ui-2 libxfce4util exo garcon \
+xfce4-session xfce4-settings xfce4-panel xfdesktop xfconf vte-2.91 \
+gtksourceview-5 gtksourceview-4 gimp20 gimp30 gimp20-std-plugins \
+gimp30-plugins gegl-0.4 babl inkscape \
+vlc kdenlive kxmlgui6 kwidgetsaddons6 kconfigwidgets6 kcoreaddons6 \
+kitemviews6 kiconthemes6 kio6 sonnet6 knewstuff6 ktextwidgets6 \
+knotifications6 kservice6 solid6 kguiaddons6 kcolorscheme6"
+
+# 옵트인: app-installer 또는 KOREAN_LOCALE_ZIP 환경변수로 호출
 setup_korean_locale_native() {
     local locale_zip="${KOREAN_LOCALE_ZIP:-}"
 
     if [ -z "$locale_zip" ] || [ ! -f "$locale_zip" ]; then
         ui_warn "한글 로케일을 건너뜁니다 — KOREAN_LOCALE_ZIP 경로가 유효하지 않습니다."
-        ui_warn "사용법: KOREAN_LOCALE_ZIP=/path/to/locale.zip bash install.sh --korean-locale"
+        ui_warn "사용법: KOREAN_LOCALE_ZIP=/path/to/locale.zip bash install.sh"
         return 0
     fi
 
@@ -27,6 +39,9 @@ setup_korean_locale_native() {
 
     ui_info "한글 로케일 — startxfce4-ko 래퍼 생성"
     _install_startxfce4_ko_wrapper
+
+    ui_info "한글 로케일 — RC 파일에 환경변수 영구 등록"
+    setup_korean_rc
 
     ui_info "한글 로케일 — DBus 환경 전파 autostart 등록"
     _install_dbus_propagate_autostart
@@ -77,7 +92,8 @@ _install_startxfce4_ko_wrapper() {
     [ -x "$wrapper" ] && return 0
 
     mkdir -p "$HOME/bin"
-    cat > "$wrapper" << 'EOF'
+    local content
+    content=$(cat << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 set -euo pipefail
 
@@ -99,14 +115,7 @@ export QT_LOCALE_OVERRIDE=ko_KR
 export FORCE_TEXTDOMAINDIR="$PREFIX/share/locale"
 
 # 폴백 도메인 — XFCE/GTK/KDE FW6/그래픽 앱 카탈로그
-export FALLBACK_DOMAINS="mousepad xfce4-terminal thunar ristretto \
-gtk30 glib20 gdk-pixbuf libxfce4ui-2 libxfce4util exo garcon \
-xfce4-session xfce4-settings xfce4-panel xfdesktop xfconf vte-2.91 \
-gtksourceview-5 gtksourceview-4 gimp20 gimp30 gimp20-std-plugins \
-gimp30-plugins gegl-0.4 babl inkscape \
-vlc kdenlive kxmlgui6 kwidgetsaddons6 kconfigwidgets6 kcoreaddons6 \
-kitemviews6 kiconthemes6 kio6 sonnet6 knewstuff6 ktextwidgets6 \
-knotifications6 kservice6 solid6 kguiaddons6 kcolorscheme6"
+export FALLBACK_DOMAINS="__KOREAN_FALLBACK_DOMAINS__"
 
 export XDG_DATA_DIRS="$PREFIX/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
 
@@ -124,6 +133,8 @@ fi
 
 exec startxfce4
 EOF
+)
+    printf '%s\n' "${content/__KOREAN_FALLBACK_DOMAINS__/$_KOREAN_FALLBACK_DOMAINS}" > "$wrapper"
     chmod +x "$wrapper"
 }
 

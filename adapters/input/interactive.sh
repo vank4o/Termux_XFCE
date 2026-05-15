@@ -35,43 +35,4 @@ resolve_interactive_inputs() {
         export PROOT_DISTRO SKIP_PROOT
     fi
 
-    # 한글 입력기
-    if [ -z "${SKIP_KOREAN:-}" ]; then
-        if ui_confirm "한글 입력기(fcitx5-hangul)를 설치하겠습니까?"; then
-            SKIP_KOREAN=false
-        else
-            SKIP_KOREAN=true
-        fi
-        export SKIP_KOREAN
-    fi
-
-    # XFCE 한글 로케일 (메뉴/UI 한글화)
-    if [ -z "${KOREAN_LOCALE:-}" ]; then
-        if ui_confirm "XFCE 메뉴/UI를 한글로 표시하겠습니까? (한글 로케일 적용)"; then
-            KOREAN_LOCALE=true
-        else
-            KOREAN_LOCALE=false
-        fi
-        export KOREAN_LOCALE
-    fi
-
-    # GPU 가속
-    if [ -z "${INSTALL_GPU:-}" ]; then
-        if ui_confirm "GPU 가속(mesa + Turnip Vulkan, Adreno)을 설치하겠습니까?"; then
-            INSTALL_GPU=true
-        else
-            INSTALL_GPU=false
-        fi
-        export INSTALL_GPU
-    fi
-
-    # GPU 개발 도구
-    if [ "${INSTALL_GPU:-false}" = "true" ] && [ -z "${INSTALL_GPU_DEV:-}" ]; then
-        if ui_confirm "GPU 개발 도구(clvk 등)를 설치하겠습니까?"; then
-            INSTALL_GPU_DEV=true
-        else
-            INSTALL_GPU_DEV=false
-        fi
-        export INSTALL_GPU_DEV
-    fi
 }

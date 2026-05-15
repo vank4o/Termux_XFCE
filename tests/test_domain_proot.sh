@@ -74,6 +74,56 @@ _test_proot_install_skips_if_exists() {
 }
 it "멱등성 — rootfs가 이미 있으면 install을 건너뛴다" _test_proot_install_skips_if_exists
 
+# --proot-only 모드 회귀: proot-distro 명령이 없는 상태에서 setup_proot_install이
+# PKGS_TERMUX_PROOT를 먼저 설치해야 한다. (이전 버그: rc=127 command not found)
+_test_proot_install_installs_termux_proot_pkgs_when_missing() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu"
+
+    # 호스트에 proot-distro가 실제로 설치돼 있을 수 있으므로 command -v를 강제로 false
+    unset -f proot-distro
+    command() {
+        if [ "${1:-}" = "-v" ] && [ "${2:-}" = "proot-distro" ]; then
+            return 1
+        fi
+        builtin command "$@"
+    }
+    reset_mock_calls
+
+    setup_proot_install 2>/dev/null || true
+
+    # PKGS_TERMUX_PROOT 의 각 패키지가 pkg_install로 호출돼야 함
+    assert_was_called "pkg_install proot-distro"
+    assert_was_called "pkg_install x11-repo"
+    assert_was_called "pkg_install tur-repo"
+    assert_was_called "pkg_update"
+    # 의존성 설치 후 최종 proot_install도 호출
+    assert_was_called "proot-distro install"
+
+    unset -f command
+    cleanup_sandbox "$sb"
+}
+it "--proot-only 회귀: proot-distro 미설치 시 PKGS_TERMUX_PROOT를 먼저 설치한다" \
+    _test_proot_install_installs_termux_proot_pkgs_when_missing
+
+_test_proot_install_skips_dep_install_when_proot_distro_present() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu"
+    # proot-distro 함수가 정의된 상태(_load_domain 기본 mock) → 의존성 설치 건너뛰어야 함
+    reset_mock_calls
+
+    setup_proot_install 2>/dev/null || true
+
+    # PKGS_TERMUX_PROOT 패키지가 pkg_install로 호출되지 않아야 함 (이미 있다고 간주)
+    assert_not_called "pkg_install proot-distro"
+    assert_not_called "pkg_install x11-repo"
+    # 그러나 distro 자체는 설치
+    assert_was_called "proot-distro install"
+    cleanup_sandbox "$sb"
+}
+it "proot-distro 이미 존재 시 의존성 설치 분기는 건너뛴다" \
+    _test_proot_install_skips_dep_install_when_proot_distro_present
+
 # =============================================================================
 # setup_proot_user — 멱등성
 # =============================================================================
@@ -253,6 +303,50 @@ _test_cursor_theme_copied() {
     cleanup_sandbox "$sb"
 }
 it "dist-dark 커서 테마를 proot로 복사한다" _test_cursor_theme_copied
+
+# --proot-only 회귀: src 미존재여도 return 0(set -e 안전), 그리고
+# _install_fluent_cursor 헬퍼가 로드돼 있으면 자동 호출
+_test_cursor_returns_zero_when_src_missing() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+
+    # src 없음, 헬퍼도 정의 안 함 — 그래도 return 0 (cosmetic skip)
+    local rc=0
+    setup_proot_cursor_theme >/dev/null 2>&1 || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        echo "[ASSERT] expected rc=0 (cosmetic skip), got rc=$rc" >&2
+        cleanup_sandbox "$sb"
+        return 1
+    fi
+    cleanup_sandbox "$sb"
+}
+it "--proot-only 회귀: src 미존재 시 return 0 (set -e 트립 방지)" \
+    _test_cursor_returns_zero_when_src_missing
+
+_test_cursor_invokes_fluent_helper_if_loaded() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb" "ubuntu" "testuser"
+
+    # _install_fluent_cursor stub: 호출되면 src 디렉토리를 생성하도록
+    _install_fluent_cursor() {
+        _record_call "_install_fluent_cursor"
+        mkdir -p "${PREFIX}/share/icons/dist-dark"
+        touch "${PREFIX}/share/icons/dist-dark/cursor.theme"
+    }
+    _make_proot_rootfs "$sb" "ubuntu" "testuser"
+    reset_mock_calls
+
+    setup_proot_cursor_theme 2>/dev/null || true
+
+    assert_was_called "_install_fluent_cursor"
+    # 자동 보강 후 실제 복사까지 완료
+    assert_dir_exists "${PREFIX}/var/lib/proot-distro/installed-rootfs/ubuntu/usr/share/icons/dist-dark"
+
+    unset -f _install_fluent_cursor
+    cleanup_sandbox "$sb"
+}
+it "src 없을 때 _install_fluent_cursor가 로드돼 있으면 자동 호출한다" \
+    _test_cursor_invokes_fluent_helper_if_loaded
 
 # =============================================================================
 # setup_proot_fancybash

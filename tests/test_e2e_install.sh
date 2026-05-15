@@ -567,6 +567,26 @@ _test_conky_desktop_no_trailing_ampersand() {
 it "conky autostart Exec에 trailing &가 없다" _test_conky_desktop_no_trailing_ampersand
 
 # =============================================================================
+# Regression: startXFCE 클립보드 동기화 블록
+# =============================================================================
+
+describe "e2e — startXFCE 클립보드 동기화"
+
+_test_startxfce_has_clipboard_sync() {
+    local sb; sb=$(make_sandbox)
+    _load_domain "$sb"
+    _setup_start_xfce
+
+    local shortcut="$HOME/.shortcuts/startXFCE"
+    assert_file_exists "$shortcut"
+    assert_file_contains "$shortcut" "termux-clipboard-sync"
+    assert_file_contains "$shortcut" "termux-clipboard-get"
+    assert_file_contains "$shortcut" "xclip"
+    cleanup_sandbox "$sb"
+}
+it "startXFCE에 클립보드 동기화 실행 블록이 포함된다" _test_startxfce_has_clipboard_sync
+
+# =============================================================================
 # 결과 출력
 # =============================================================================
 print_results

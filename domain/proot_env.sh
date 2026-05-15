@@ -17,6 +17,23 @@ readonly PROOT_ROOTFS="$PREFIX/var/lib/proot-distro/installed-rootfs"
 
 setup_proot_install() {
     ui_info "${PROOT_DISTRO} proot-distro 설치"
+
+    # 의존성 보강: --proot-only 모드는 setup_termux_base를 건너뛰므로
+    # proot-distro 패키지가 없을 수 있다. 도메인이 자기 런타임 의존성을 보장.
+    if ! command -v proot-distro >/dev/null 2>&1; then
+        ui_info "proot-distro 패키지가 없어 먼저 설치합니다 (PKGS_TERMUX_PROOT)"
+        pkg_update
+        for _p in "${PKGS_TERMUX_PROOT[@]}"; do
+            if pkg_is_installed "$_p"; then
+                ui_info "  ${_p} — 이미 설치됨"
+            else
+                ui_info "  ${_p} 설치 중..."
+                pkg_install "$_p"
+            fi
+        done
+        unset _p
+    fi
+
     # 이미 설치된 경우 건너뜀
     [ -d "${PROOT_ROOTFS}/${PROOT_DISTRO}" ] && {
         ui_warn "${PROOT_DISTRO}가 이미 설치되어 있습니다. 건너뜁니다."
@@ -223,9 +240,18 @@ setup_proot_cursor_theme() {
     local dst="${PROOT_ROOTFS}/${PROOT_DISTRO}/usr/share/icons/dist-dark"
 
     [ -d "$dst" ] && return 0
+
+    # 의존성 보강: --proot-only 모드는 setup_xfce_theme를 건너뛰므로 dist-dark가 없을 수 있다.
+    # _install_fluent_cursor가 로드돼 있으면 자동 다운로드 (xfce_env.sh와 함께 source된 경우).
+    if [ ! -d "$src" ] && declare -F _install_fluent_cursor >/dev/null 2>&1; then
+        ui_info "  dist-dark 미존재 → _install_fluent_cursor 자동 호출"
+        _install_fluent_cursor || true
+    fi
+
+    # 여전히 없으면 cosmetic 실패이므로 경고 후 skip (set -e에서 distro 전체 중단 방지)
     [ -d "$src" ] || {
-        ui_warn "dist-dark 커서 테마가 없습니다. setup_xfce_theme를 먼저 실행하세요."
-        return 1
+        ui_warn "dist-dark 커서 테마를 준비하지 못했습니다 — 커서 테마 적용을 건너뜁니다."
+        return 0
     }
 
     cp -r "$src" "$dst"

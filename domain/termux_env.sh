@@ -28,54 +28,6 @@ setup_termux_base() {
     _setup_gpu_env
 }
 
-setup_termux_gpu() {
-    ui_info "GPU 가속(mesa, Adreno) 설치"
-    local total=${#PKGS_TERMUX_GPU[@]} i=0
-    for p in "${PKGS_TERMUX_GPU[@]}"; do
-        ((++i))
-        if pkg_is_installed "$p"; then
-            ui_info "  (${i}/${total}) ${p} — 이미 설치됨"
-        else
-            ui_info "  (${i}/${total}) ${p} 설치 중..."
-            pkg_install "$p"
-        fi
-    done
-    _detect_and_log_gpu
-}
-
-setup_termux_gpu_dev() {
-    ui_info "GPU 개발 도구(clvk 등) 설치"
-    local total=${#PKGS_TERMUX_GPU_DEV[@]} i=0
-    for p in "${PKGS_TERMUX_GPU_DEV[@]}"; do
-        ((++i))
-        if pkg_is_installed "$p"; then
-            ui_info "  (${i}/${total}) ${p} — 이미 설치됨"
-        else
-            ui_info "  (${i}/${total}) ${p} 설치 중..."
-            pkg_install "$p"
-        fi
-    done
-}
-
-setup_termux_korean() {
-    ui_info "한글 입력기(fcitx5-hangul) 설치"
-    pkg_is_installed "tur-repo" || pkg_install tur-repo
-    _setup_tur_multilib
-
-    local total=${#PKGS_TERMUX_KOREAN[@]} i=0
-    for p in "${PKGS_TERMUX_KOREAN[@]}"; do
-        ((++i))
-        if pkg_is_installed "$p"; then
-            ui_info "  (${i}/${total}) ${p} — 이미 설치됨"
-        else
-            ui_info "  (${i}/${total}) ${p} 설치 중..."
-            pkg_install "$p"
-        fi
-    done
-    _cleanup_duplicate_fcitx_autostart
-    _setup_korean_env
-}
-
 setup_termux_shortcuts() {
     ui_info "Termux 단축키(startXFCE) 설정"
     _setup_start_xfce
@@ -84,6 +36,32 @@ setup_termux_shortcuts() {
     _setup_prun_gui
     _setup_cp2menu
     _setup_app_installer
+    _setup_clipboard_sync
+}
+
+_download_and_open_apk() {
+    local apk_url="$1" apk_filename="$2"
+    local dl_dir="$HOME/storage/downloads"
+    local apk_path="${dl_dir}/${apk_filename}"
+
+    if [ ! -d "$dl_dir" ]; then
+        dl_dir="$HOME"
+        apk_path="${dl_dir}/${apk_filename}"
+        ui_warn "storage/downloads 없음 — ${apk_path} 에 저장합니다."
+    fi
+
+    if [ -f "$apk_path" ]; then
+        ui_warn "APK가 이미 다운로드되어 있습니다: ${apk_path}"
+    else
+        if ! wget -q "$apk_url" -O "$apk_path"; then
+            rm -f "$apk_path"
+            ui_warn "APK 다운로드 실패: ${apk_url}"
+            return 0
+        fi
+    fi
+
+    termux-open "$apk_path" 2>/dev/null || \
+        ui_warn "APK 자동 열기 실패 — 수동으로 설치하세요: ${apk_path}"
 }
 
 setup_termux_x11_apk() {
@@ -100,25 +78,21 @@ setup_termux_x11_apk() {
             ;;
     esac
 
-    local apk_url="https://github.com/termux/termux-x11/releases/download/nightly/${apk_name}"
-    local dl_dir="$HOME/storage/downloads"
-    local apk_path="${dl_dir}/${apk_name}"
+    _download_and_open_apk \
+        "https://github.com/termux/termux-x11/releases/download/nightly/${apk_name}" \
+        "$apk_name"
+}
 
-    # storage/downloads가 없으면 HOME에 저장 (termux-setup-storage 미실행 환경)
-    if [ ! -d "$dl_dir" ]; then
-        dl_dir="$HOME"
-        apk_path="${dl_dir}/${apk_name}"
-        ui_warn "storage/downloads 없음 — ${apk_path} 에 저장합니다."
-    fi
+setup_termux_api_apk() {
+    _download_and_open_apk \
+        'https://github.com/termux/termux-api/releases/download/v0.53.0/termux-api-app_v0.53.0+github.debug.apk' \
+        'termux-api.apk'
+}
 
-    if [ -f "$apk_path" ]; then
-        ui_warn "APK가 이미 다운로드되어 있습니다: ${apk_path}"
-    else
-        wget -q "$apk_url" -O "$apk_path"
-    fi
-
-    termux-open "$apk_path" 2>/dev/null || \
-        ui_warn "APK 자동 열기 실패 — 수동으로 설치하세요: ${apk_path}"
+setup_termux_float_apk() {
+    _download_and_open_apk \
+        'https://github.com/termux/termux-float/releases/download/v0.17.0/termux-float-app_v0.17.0+github.debug.apk' \
+        'termux-float.apk'
 }
 
 setup_termux_widget() {
@@ -258,6 +232,32 @@ LOCALE
 
     while IFS= read -r rc; do
         _append_to_rc "# termux-xfce-locale" "$block" "$rc"
+    done < <(_rc_targets)
+}
+
+setup_korean_rc() {
+    local block
+    block=$(cat << 'KOREAN'
+
+# termux-xfce-korean — force_gettext.so 한글 UI 자동 적용
+if [ -f "$PREFIX/lib/force_gettext.so" ]; then
+    export LANG="ko_KR.UTF-8"
+    export LANGUAGE="ko_KR:ko:en_US:en"
+    export FORCE_TEXTDOMAINDIR="$PREFIX/share/locale"
+    export FALLBACK_DOMAINS="__KOREAN_FALLBACK_DOMAINS__"
+    export XDG_DATA_DIRS="$PREFIX/share${XDG_DATA_DIRS:+:$XDG_DATA_DIRS}"
+    QT_TRANSLATIONS_PATH="$PREFIX/share/qt6/translations:$PREFIX/share/qt/translations${QT_TRANSLATIONS_PATH:+:$QT_TRANSLATIONS_PATH}"
+    export QT_TRANSLATIONS_PATH
+    export KDE_LANG=ko QT_LOCALE_OVERRIDE=ko_KR
+    case ":${LD_PRELOAD-}:" in *:"$PREFIX/lib/force_gettext.so":*) ;; *)
+        export LD_PRELOAD="$PREFIX/lib/force_gettext.so${LD_PRELOAD:+:$LD_PRELOAD}";; esac
+fi
+KOREAN
+)
+    block="${block/__KOREAN_FALLBACK_DOMAINS__/$_KOREAN_FALLBACK_DOMAINS}"
+
+    while IFS= read -r rc; do
+        _append_to_rc "# termux-xfce-korean" "$block" "$rc"
     done < <(_rc_targets)
 }
 
@@ -682,4 +682,27 @@ Categories=System;
 Terminal=false
 StartupNotify=false
 EOF
+}
+
+_setup_clipboard_sync() {
+    local bin="$PREFIX/bin/termux-clipboard-sync"
+    mkdir -p "$(dirname "$bin")"
+
+    cat > "$bin" << 'SYNCEOF'
+#!/data/data/com.termux/files/usr/bin/bash
+# Android ↔ X11 클립보드 양방향 동기화 데몬
+PREV_ANDROID="" PREV_X11=""
+while true; do
+    sleep 2
+    ANDROID=$(termux-clipboard-get 2>/dev/null) || continue
+    X11=$(DISPLAY="${DISPLAY:-:0}" xclip -selection clipboard -o 2>/dev/null) || continue
+    if [ "$ANDROID" != "$PREV_ANDROID" ] && [ "$ANDROID" != "$X11" ]; then
+        printf '%s' "$ANDROID" | DISPLAY="${DISPLAY:-:0}" xclip -selection clipboard -i 2>/dev/null
+    elif [ "$X11" != "$PREV_X11" ] && [ "$X11" != "$ANDROID" ]; then
+        termux-clipboard-set "$X11" 2>/dev/null
+    fi
+    PREV_ANDROID="$ANDROID" PREV_X11="$X11"
+done
+SYNCEOF
+    chmod +x "$bin"
 }

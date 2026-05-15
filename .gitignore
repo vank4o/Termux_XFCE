@@ -10,6 +10,11 @@ WhiteSur-Light/
 # Termux 설정 (개인 정보 포함)
 .config/
 
+# 테스트 로그
+tests/install_logs/
+tests/autopilot.log
+tests/result_*.log
+
 # 기타
 *.deb
 *.tar.gz
