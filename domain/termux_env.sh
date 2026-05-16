@@ -409,13 +409,39 @@ ZSHRC
 }
 
 _setup_korean_env() {
+    # fcitx5 hangul 프로필 설정
+    local fcitx_conf_dir="$HOME/.config/fcitx5"
+    mkdir -p "$fcitx_conf_dir"
+    local profile="$fcitx_conf_dir/profile"
+    if ! grep -q "hangul" "$profile" 2>/dev/null; then
+        cat > "$profile" << 'PROFILE_EOF'
+[Groups/0]
+# Group Name
+Name=Default
+# Layout
+Default Layout=us
+# Default Input Method
+DefaultIM=hangul
+
+[Groups/0/Items/0]
+# Name
+Name=keyboard-us
+# Layout
+Layout=
+
+[Groups/0/Items/1]
+# Name
+Name=hangul
+# Layout
+Layout=
+
+[GroupOrder]
+0=Default
+PROFILE_EOF
+    fi
+
     # fcitx5 자동시작 설정
-    # Note: fcitx5 패키지가 시스템 autostart를 이미 제공
-    #       ($PREFIX/etc/xdg/autostart/org.fcitx.Fcitx5.desktop)
-    #       사용자 autostart를 중복 생성하면 XFCE4가 둘 다 실행 →
-    #       두 번째 인스턴스가 dbus 이름 경쟁에서 실패하며
-    #       "Failed to create addon: dbus Unable to request dbus name" 경고 유발
-    #       → 시스템 autostart 있으면 스킵, 없는 구버전 Termux에서만 폴백 생성
+    # 시스템 autostart 있으면 스킵, 없는 구버전 Termux에서만 폴백 생성
     local system_autostart="${PREFIX}/etc/xdg/autostart/org.fcitx.Fcitx5.desktop"
     if [ -f "$system_autostart" ]; then
         return 0
