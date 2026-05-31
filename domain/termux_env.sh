@@ -526,7 +526,6 @@ _detect_and_log_gpu() {
 
 _setup_kill_termux_x11() {
     local bin="$PREFIX/bin/kill_termux_x11"
-    [ -f "$bin" ] && return 0
 
     mkdir -p "$PREFIX/share/applications"
     script_build_kill_x11 "$bin"
