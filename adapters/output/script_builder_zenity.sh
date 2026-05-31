@@ -29,51 +29,60 @@ _EXISTING_XFCE=$(pgrep -x xfce4-session 2>/dev/null | head -1 || echo "")
 _EXISTING_TX11=$(pgrep -f "termux-x11 :" 2>/dev/null | head -1 || echo "")
 
 if [ -n "$_EXISTING_SOCK" ] || [ -n "$_EXISTING_XFCE" ] || [ -n "$_EXISTING_TX11" ]; then
-    # 기존 X 소켓으로 DISPLAY 설정 (zenity 표시용)
-    if [ -n "$_EXISTING_SOCK" ]; then
-        _NUM=$(basename "$_EXISTING_SOCK" | sed 's/^X//')
-        export DISPLAY=":${_NUM}"
+    if [ -z "$_EXISTING_TX11" ]; then
+        # termux-x11 프로세스 없음 = stale 세션 — 자동 정리 후 신규 시작
+        killall -9 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+        sleep 1
+        rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
+    else
+        # live 세션 — 기존 X 소켓으로 DISPLAY 설정 (zenity 표시용)
+        if [ -n "$_EXISTING_SOCK" ]; then
+            _NUM=$(basename "$_EXISTING_SOCK" | sed 's/^X//')
+            export DISPLAY=":${_NUM}"
+        fi
+
+        XFCE_STATUS=$([ -n "$_EXISTING_XFCE" ] && echo "실행 중 (PID: ${_EXISTING_XFCE})" || echo "미실행")
+        TX11_STATUS=$([ -n "$_EXISTING_TX11" ] && echo "실행 중 (PID: ${_EXISTING_TX11})" || echo "미실행")
+        DBUS_COUNT=$(pgrep dbus-daemon 2>/dev/null | wc -l | tr -d ' ')
+
+        choice=$(zenity --list \
+            --title="XFCE 세션 중복 감지" \
+            --text="⚠ X11 세션이 이미 실행 중입니다\n\n현황\n  • XFCE4 세션 : ${XFCE_STATUS}\n  • Termux:X11 : ${TX11_STATUS}\n  • dbus 수     : ${DBUS_COUNT:-0}개" \
+            --column="동작" --height=320 \
+            "기존 세션으로 이동" \
+            "세션 종료 후 재시작" \
+            "세션 전체 종료" \
+            2>/dev/null || true)
+
+        case "$choice" in
+            "기존 세션으로 이동")
+                am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity
+                exit 0
+                ;;
+            "세션 종료 후 재시작")
+                killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+                am force-stop com.termux.x11 2>/dev/null || true
+                sleep 1
+                rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
+                ;;
+            "세션 전체 종료")
+                killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+                am force-stop com.termux.x11 2>/dev/null || true
+                rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
+                termux-wake-unlock 2>/dev/null || true
+                exit 0
+                ;;
+            *)
+                # 취소(ESC/닫기) — 아무것도 안 함
+                exit 0
+                ;;
+        esac
     fi
-
-    XFCE_STATUS=$([ -n "$_EXISTING_XFCE" ] && echo "실행 중 (PID: ${_EXISTING_XFCE})" || echo "미실행")
-    TX11_STATUS=$([ -n "$_EXISTING_TX11" ] && echo "실행 중 (PID: ${_EXISTING_TX11})" || echo "미실행")
-    DBUS_COUNT=$(pgrep dbus-daemon 2>/dev/null | wc -l | tr -d ' ')
-
-    choice=$(zenity --list \
-        --title="XFCE 세션 중복 감지" \
-        --text="⚠ X11 세션이 이미 실행 중입니다\n\n현황\n  • XFCE4 세션 : ${XFCE_STATUS}\n  • Termux:X11 : ${TX11_STATUS}\n  • dbus 수     : ${DBUS_COUNT:-0}개" \
-        --column="동작" --height=320 \
-        "기존 세션으로 이동" \
-        "세션 종료 후 재시작" \
-        "세션 전체 종료" \
-        2>/dev/null || true)
-
-    case "$choice" in
-        "기존 세션으로 이동")
-            am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity
-            exit 0
-            ;;
-        "세션 종료 후 재시작")
-            # 정리 후 아래 신규 세션 시작 로직으로 fall-through
-            killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
-            sleep 1
-            rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
-            ;;
-        "세션 전체 종료")
-            killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
-            rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
-            termux-wake-unlock 2>/dev/null || true
-            exit 0
-            ;;
-        *)
-            # 취소(ESC/닫기) — 아무것도 안 함
-            exit 0
-            ;;
-    esac
 fi
 # ───────────────���────────────────────────────────��───────────────
 
 killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+am force-stop com.termux.x11 2>/dev/null || true
 sleep 1
 
 # 잔류 X 소켓/락 파일 전체 삭제
@@ -95,8 +104,8 @@ for _DTRY in 0 1 2 3; do
     TX11_PID=""
 done
 
-# Termux:X11 APK 열기 — -S: 기존 APK를 force-stop 후 새로 시작하여 X 서버 재연결 보장
-am start -S --user 0 -n com.termux.x11/com.termux.x11.MainActivity
+# Termux:X11 APK 열기 (APK는 위에서 이미 force-stop 됨)
+am start --user 0 -n com.termux.x11/com.termux.x11.MainActivity
 
 # X 소켓이 생길 때까지 최대 10초 추가 대기 (위 루프에서 이미 감지된 경우 즉시 통과)
 DISPLAY_NUM=""
