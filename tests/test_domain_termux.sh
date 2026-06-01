@@ -1137,53 +1137,33 @@ _test_termux_repos_skips_already_installed() {
 it "이미 설치된 repo는 건너뛰지만 pkg_update는 호출" _test_termux_repos_skips_already_installed
 
 # =============================================================================
-# _cleanup_duplicate_fcitx_autostart — 시스템+사용자 동시 존재 시만 제거
+# _cleanup_duplicate_fcitx_autostart — 무조건 사용자 fcitx5.desktop 제거 (nimf 전환)
 # =============================================================================
 
 describe "termux_env — _cleanup_duplicate_fcitx_autostart"
 
-_test_cleanup_removes_user_when_both_present() {
+_test_cleanup_removes_user_fcitx5_desktop() {
     local sb; sb=$(make_sandbox)
     _load_domain "$sb"
-    mkdir -p "${PREFIX}/etc/xdg/autostart"
-    touch "${PREFIX}/etc/xdg/autostart/org.fcitx.Fcitx5.desktop"
+    mkdir -p "${HOME}/.config/autostart"
     touch "${HOME}/.config/autostart/fcitx5.desktop"
 
     _cleanup_duplicate_fcitx_autostart
 
     [ ! -f "${HOME}/.config/autostart/fcitx5.desktop" ]
-    assert_file_exists "${PREFIX}/etc/xdg/autostart/org.fcitx.Fcitx5.desktop"
     cleanup_sandbox "$sb"
 }
-it "시스템+사용자 둘 다 있으면 사용자 autostart 제거" _test_cleanup_removes_user_when_both_present
+it "사용자 fcitx5.desktop을 무조건 제거한다" _test_cleanup_removes_user_fcitx5_desktop
 
-_test_cleanup_keeps_user_when_no_system() {
+_test_cleanup_noop_when_no_file() {
     local sb; sb=$(make_sandbox)
     _load_domain "$sb"
-    # 시스템 autostart 없음 — 사용자 것만 존재 (폴백 상황)
-    touch "${HOME}/.config/autostart/fcitx5.desktop"
 
     _cleanup_duplicate_fcitx_autostart
 
-    assert_file_exists "${HOME}/.config/autostart/fcitx5.desktop"
-    cleanup_sandbox "$sb"
-}
-it "시스템 autostart 부재 시 사용자 autostart 유지 (폴백)" _test_cleanup_keeps_user_when_no_system
-
-_test_cleanup_noop_when_only_system() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-    mkdir -p "${PREFIX}/etc/xdg/autostart"
-    touch "${PREFIX}/etc/xdg/autostart/org.fcitx.Fcitx5.desktop"
-    rm -f "${HOME}/.config/autostart/fcitx5.desktop"
-
-    # 사용자 autostart 없음 — 변경 없어야 함
-    _cleanup_duplicate_fcitx_autostart
-
-    assert_file_exists "${PREFIX}/etc/xdg/autostart/org.fcitx.Fcitx5.desktop"
     [ ! -f "${HOME}/.config/autostart/fcitx5.desktop" ]
     cleanup_sandbox "$sb"
 }
-it "시스템만 있고 사용자 없음 — no-op" _test_cleanup_noop_when_only_system
+it "파일 없으면 에러 없이 no-op" _test_cleanup_noop_when_no_file
 
 print_results
