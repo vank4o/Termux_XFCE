@@ -410,7 +410,7 @@ ZSHRC
 }
 
 _setup_korean_env() {
-    _install_nimf_native
+    _install_nimf_native || ui_warn "nimf 설치 실패 — autostart만 설정합니다"
 
     local autostart_dir="$HOME/.config/autostart"
     mkdir -p "$autostart_dir"

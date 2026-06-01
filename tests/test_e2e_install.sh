@@ -93,7 +93,7 @@ _test_zshrc_has_locale_block_after_composition() {
     setup_termux_base
 
     assert_file_contains "${HOME}/.zshrc" "termux-xfce-locale"
-    assert_file_contains "${HOME}/.zshrc" "XMODIFIERS=@im=fcitx5"
+    assert_file_contains "${HOME}/.zshrc" "XMODIFIERS=\"@im=nimf\""
 
     cleanup_sandbox "$sb"
 }
@@ -303,21 +303,18 @@ _test_zsh_p10k_precedes_aliases() {
 it "setup_termux_base()에서 _setup_zsh_p10k가 _setup_aliases보다 먼저 호출된다" _test_zsh_p10k_precedes_aliases
 
 # =============================================================================
-# Regression #4: fcitx5 중복 autostart
+# Regression #4: nimf autostart + fcitx5 비활성화
 # -----------------------------------------------------------------------------
-# Issue #2 — "Failed to create addon: dbus Unable to request dbus name.
-#            Is there another fcitx already running?"
-# 원인: _setup_korean_env가 ~/.config/autostart/fcitx5.desktop을 항상 생성
-#      fcitx5 패키지가 제공하는 시스템 autostart와 중복 → 두 인스턴스 실행
+# _setup_korean_env는 nimf.desktop을 생성하고, fcitx5 시스템 autostart가
+# 있으면 Hidden=true 오버라이드로 비활성화한다.
 # =============================================================================
 
-describe "e2e — fcitx5 autostart 중복 방지 (issue #2 regression)"
+describe "e2e — nimf autostart + fcitx5 비활성화"
 
-_test_skips_user_autostart_when_system_exists() {
+_test_nimf_autostart_created_with_fcitx5_disabled() {
     local sb; sb=$(make_sandbox)
     _load_domain "$sb"
 
-    # 시스템 autostart 존재 시뮬레이션 (fcitx5 패키지가 제공하는 파일)
     mkdir -p "${PREFIX}/etc/xdg/autostart"
     cat > "${PREFIX}/etc/xdg/autostart/org.fcitx.Fcitx5.desktop" << 'EOF'
 [Desktop Entry]
@@ -327,72 +324,44 @@ EOF
 
     _setup_korean_env
 
-    # 사용자 autostart는 생성되지 않아야 함
-    local user_autostart="$HOME/.config/autostart/fcitx5.desktop"
-    if [ -f "$user_autostart" ]; then
-        echo "[ASSERT] 시스템 autostart 있음에도 사용자 autostart가 생성됨" >&2
-        return 1
-    fi
+    assert_file_exists "$HOME/.config/autostart/nimf.desktop"
+    assert_file_contains "$HOME/.config/autostart/nimf.desktop" "Exec=nimf"
+    assert_file_contains "$HOME/.config/autostart/org.fcitx.Fcitx5.desktop" "Hidden=true"
 
     cleanup_sandbox "$sb"
 }
-it "시스템 autostart 존재 시 사용자 autostart를 생성하지 않는다" _test_skips_user_autostart_when_system_exists
+it "nimf autostart 생성 + fcitx5 시스템 autostart Hidden=true" _test_nimf_autostart_created_with_fcitx5_disabled
 
-_test_creates_user_autostart_when_system_missing() {
-    # 시스템 autostart가 없는 구버전 Termux 대응 폴백
+_test_nimf_autostart_without_fcitx5_system() {
     local sb; sb=$(make_sandbox)
     _load_domain "$sb"
-
-    # 시스템 autostart 없음 (sandbox 초기 상태 그대로)
 
     _setup_korean_env
 
-    local user_autostart="$HOME/.config/autostart/fcitx5.desktop"
-    assert_file_exists "$user_autostart"
-    assert_file_contains "$user_autostart" "Exec=fcitx5"
+    assert_file_exists "$HOME/.config/autostart/nimf.desktop"
+    assert_file_contains "$HOME/.config/autostart/nimf.desktop" "Exec=nimf"
 
     cleanup_sandbox "$sb"
 }
-it "시스템 autostart 없으면 사용자 autostart를 폴백 생성한다" _test_creates_user_autostart_when_system_missing
+it "fcitx5 시스템 autostart 없어도 nimf autostart 생성" _test_nimf_autostart_without_fcitx5_system
 
-_test_cleanup_removes_duplicate_user_autostart() {
-    # 기존 설치본 마이그레이션 — 이미 잘못 생성된 사용자 autostart 제거
+_test_cleanup_removes_fcitx5_user_autostart() {
     local sb; sb=$(make_sandbox)
     _load_domain "$sb"
 
-    # 시스템 autostart + 기존 사용자 autostart 둘 다 존재하는 상태
-    mkdir -p "${PREFIX}/etc/xdg/autostart"
-    echo "[Desktop Entry]" > "${PREFIX}/etc/xdg/autostart/org.fcitx.Fcitx5.desktop"
     mkdir -p "$HOME/.config/autostart"
     echo "[Desktop Entry]" > "$HOME/.config/autostart/fcitx5.desktop"
 
     _cleanup_duplicate_fcitx_autostart
 
     if [ -f "$HOME/.config/autostart/fcitx5.desktop" ]; then
-        echo "[ASSERT] 중복 사용자 autostart가 제거되지 않음" >&2
+        echo "[ASSERT] fcitx5 사용자 autostart가 제거되지 않음" >&2
         return 1
     fi
 
     cleanup_sandbox "$sb"
 }
-it "기존 설치본의 중복 사용자 autostart를 제거한다 (마이그레이션)" _test_cleanup_removes_duplicate_user_autostart
-
-_test_cleanup_preserves_user_autostart_if_no_system() {
-    # 시스템 autostart 없는 구버전에서 사용자 autostart는 남겨둬야 함
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-
-    # 시스템 autostart 없음, 사용자 autostart만 존재
-    mkdir -p "$HOME/.config/autostart"
-    echo "[Desktop Entry]" > "$HOME/.config/autostart/fcitx5.desktop"
-
-    _cleanup_duplicate_fcitx_autostart
-
-    assert_file_exists "$HOME/.config/autostart/fcitx5.desktop"
-
-    cleanup_sandbox "$sb"
-}
-it "시스템 autostart 없으면 사용자 autostart를 제거하지 않는다" _test_cleanup_preserves_user_autostart_if_no_system
+it "마이그레이션 — fcitx5 사용자 autostart 제거" _test_cleanup_removes_fcitx5_user_autostart
 
 # =============================================================================
 # Regression #5: conky backend 설정
