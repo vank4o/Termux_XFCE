@@ -31,7 +31,8 @@ _EXISTING_TX11=$(pgrep -f "termux-x11 :" 2>/dev/null | head -1 || echo "")
 if [ -n "$_EXISTING_SOCK" ] || [ -n "$_EXISTING_XFCE" ] || [ -n "$_EXISTING_TX11" ]; then
     if [ -z "$_EXISTING_TX11" ] || [ -z "$_EXISTING_XFCE" ]; then
         # stale/zombie 세션 — termux-x11 또는 xfce4-session 중 하나라도 없으면 자동 정리
-        killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+        killall -9 termux-x11 Xwayland xfce4-session xfwm4 xfdesktop xfce4-panel xfsettingsd xfconfd xfce4-power-manager xfce4-notifyd xfce4-screensaver conky nimf pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+        pkill -f conky 2>/dev/null || true
         am force-stop com.termux.x11 2>/dev/null || true
         pkill -f termux-clipboard-sync 2>/dev/null || true
         sleep 1
@@ -64,14 +65,16 @@ if [ -n "$_EXISTING_SOCK" ] || [ -n "$_EXISTING_XFCE" ] || [ -n "$_EXISTING_TX11
                 exit 0
                 ;;
             "세션 종료 후 재시작")
-                killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+                killall -9 termux-x11 Xwayland xfce4-session xfwm4 xfdesktop xfce4-panel xfsettingsd xfconfd xfce4-power-manager xfce4-notifyd xfce4-screensaver conky nimf pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+                pkill -f conky 2>/dev/null || true
                 am force-stop com.termux.x11 2>/dev/null || true
                 pkill -f termux-clipboard-sync 2>/dev/null || true
                 sleep 1
                 rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
                 ;;
             "세션 전체 종료")
-                killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+                killall -9 termux-x11 Xwayland xfce4-session xfwm4 xfdesktop xfce4-panel xfsettingsd xfconfd xfce4-power-manager xfce4-notifyd xfce4-screensaver conky nimf pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+                pkill -f conky 2>/dev/null || true
                 am force-stop com.termux.x11 2>/dev/null || true
                 pkill -f termux-clipboard-sync 2>/dev/null || true
                 rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
@@ -87,7 +90,8 @@ if [ -n "$_EXISTING_SOCK" ] || [ -n "$_EXISTING_XFCE" ] || [ -n "$_EXISTING_TX11
 fi
 # ───────────────���────────────────────────────────��───────────────
 
-killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+killall -9 termux-x11 Xwayland xfce4-session xfwm4 xfdesktop xfce4-panel xfsettingsd xfconfd xfce4-power-manager xfce4-notifyd xfce4-screensaver conky nimf pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+pkill -f conky 2>/dev/null || true
 am force-stop com.termux.x11 2>/dev/null || true
 sleep 1
 
@@ -214,7 +218,8 @@ if [ -z "$XFCE_PID" ] && [ -z "$TX11_PID" ]; then
 fi
 
 # 모든 관련 프로세스 종료 (startXFCE 정리 로직과 동일)
-killall -9 termux-x11 Xwayland xfce4-session pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+killall -9 termux-x11 Xwayland xfce4-session xfwm4 xfdesktop xfce4-panel xfsettingsd xfconfd xfce4-power-manager xfce4-notifyd xfce4-screensaver conky nimf pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+pkill -f conky 2>/dev/null || true
 am force-stop com.termux.x11 2>/dev/null || true
 pkill -f termux-clipboard-sync 2>/dev/null || true
 sleep 1
