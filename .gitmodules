@@ -1,3 +1,4 @@
 [submodule "app-installer"]
 	path = app-installer
 	url = https://github.com/yanghoeg/App-Installer.git
+	branch = dev
