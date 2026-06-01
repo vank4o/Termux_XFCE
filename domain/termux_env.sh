@@ -24,6 +24,7 @@ setup_termux_base() {
     _setup_zsh_p10k
     _setup_aliases
     _setup_locale
+    _setup_korean_env
     _setup_xdg_runtime
     _setup_gpu_env
 }
@@ -224,9 +225,9 @@ export LANG=ko_KR.UTF-8
 export LC_ALL=
 export XDG_CONFIG_HOME="$HOME/.config"
 # XDG_RUNTIME_DIR은 _setup_xdg_runtime 블록에서 관리 (mode 700 user-private)
-export XMODIFIERS=@im=fcitx5
-export GTK_IM_MODULE=fcitx5
-export QT_IM_MODULE=fcitx5
+export XMODIFIERS="@im=nimf"
+export GTK_IM_MODULE=nimf
+export QT_IM_MODULE=nimf
 LOCALE
 )
 
@@ -409,70 +410,53 @@ ZSHRC
 }
 
 _setup_korean_env() {
-    # fcitx5 hangul 프로필 설정
-    local fcitx_conf_dir="$HOME/.config/fcitx5"
-    mkdir -p "$fcitx_conf_dir"
-    local profile="$fcitx_conf_dir/profile"
-    if ! grep -q "hangul" "$profile" 2>/dev/null; then
-        cat > "$profile" << 'PROFILE_EOF'
-[Groups/0]
-# Group Name
-Name=Default
-# Layout
-Default Layout=us
-# Default Input Method
-DefaultIM=hangul
-
-[Groups/0/Items/0]
-# Name
-Name=keyboard-us
-# Layout
-Layout=
-
-[Groups/0/Items/1]
-# Name
-Name=hangul
-# Layout
-Layout=
-
-[GroupOrder]
-0=Default
-PROFILE_EOF
-    fi
-
-    # fcitx5 자동시작 설정
-    # 시스템 autostart 있으면 스킵, 없는 구버전 Termux에서만 폴백 생성
-    local system_autostart="${PREFIX}/etc/xdg/autostart/org.fcitx.Fcitx5.desktop"
-    if [ -f "$system_autostart" ]; then
-        return 0
-    fi
+    _install_nimf_native
 
     local autostart_dir="$HOME/.config/autostart"
     mkdir -p "$autostart_dir"
 
-    local fcitx_desktop="$autostart_dir/fcitx5.desktop"
-    [ -f "$fcitx_desktop" ] && return 0
+    local nimf_desktop="$autostart_dir/nimf.desktop"
+    [ -f "$nimf_desktop" ] && return 0
 
-    cat > "$fcitx_desktop" << 'EOF'
+    cat > "$nimf_desktop" << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=Nimf
+Exec=nimf
+Hidden=false
+X-GNOME-Autostart-enabled=true
+EOF
+
+    # fcitx5 시스템 autostart가 있으면 사용자 오버라이드로 비활성화
+    local fcitx_sys="${PREFIX}/etc/xdg/autostart/org.fcitx.Fcitx5.desktop"
+    if [ -f "$fcitx_sys" ]; then
+        cat > "$autostart_dir/org.fcitx.Fcitx5.desktop" << 'EOF'
 [Desktop Entry]
 Type=Application
 Name=Fcitx5
 Exec=fcitx5 -d
-Hidden=false
-X-GNOME-Autostart-enabled=true
+Hidden=true
+X-GNOME-Autostart-enabled=false
 EOF
+    fi
 }
 
-# 기존 설치본에서 잘못 생성된 사용자 autostart 제거 (중복 fcitx5 방지)
-# Why: 이전 버전 _setup_korean_env가 시스템 autostart 존재 여부 확인 없이
-#      ~/.config/autostart/fcitx5.desktop을 항상 생성 → 이관 필요
+_install_nimf_native() {
+    command -v nimf &>/dev/null && return 0
+
+    local url="https://github.com/yanghoeg/Termux_XFCE/releases/download/nimf-termux-v1.4.19/nimf_1.4.19_aarch64.deb"
+    local deb="${TMPDIR:-/tmp}/nimf_1.4.19_aarch64.deb"
+
+    ui_info "nimf 한글 입력기 설치 중..."
+    wget -q "$url" -O "$deb" || { ui_warn "nimf deb 다운로드 실패"; return 1; }
+    dpkg -i --force-overwrite "$deb" 2>/dev/null
+    apt --fix-broken install -y 2>/dev/null || true
+    rm -f "$deb"
+    glib-compile-schemas "${PREFIX}/share/glib-2.0/schemas/" 2>/dev/null || true
+}
+
 _cleanup_duplicate_fcitx_autostart() {
-    local system_autostart="${PREFIX}/etc/xdg/autostart/org.fcitx.Fcitx5.desktop"
-    local user_autostart="$HOME/.config/autostart/fcitx5.desktop"
-    # 시스템 autostart가 있고 사용자 autostart도 있으면 중복 → 사용자 것 제거
-    if [ -f "$system_autostart" ] && [ -f "$user_autostart" ]; then
-        rm -f "$user_autostart"
-    fi
+    rm -f "$HOME/.config/autostart/fcitx5.desktop"
 }
 
 _setup_start_xfce() {

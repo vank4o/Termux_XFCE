@@ -252,32 +252,32 @@ it "cp2menu.desktop에 필수 필드가 있다" _test_cp2menu_desktop_valid
 # _setup_korean_env
 # =============================================================================
 
-describe "termux_env — _setup_korean_env"
+describe "termux_env — _setup_korean_env (nimf)"
 
-_test_korean_fcitx5_desktop_created() {
+_test_korean_nimf_desktop_created() {
     local sb; sb=$(make_sandbox)
     _load_domain "$sb"
 
     _setup_korean_env
-    assert_file_exists "${HOME}/.config/autostart/fcitx5.desktop"
-    assert_file_contains "${HOME}/.config/autostart/fcitx5.desktop" "Exec=fcitx5 -d"
+    assert_file_exists "${HOME}/.config/autostart/nimf.desktop"
+    assert_file_contains "${HOME}/.config/autostart/nimf.desktop" "Exec=nimf"
     cleanup_sandbox "$sb"
 }
-it "fcitx5.desktop 자동시작 파일을 생성한다" _test_korean_fcitx5_desktop_created
+it "nimf.desktop 자동시작 파일을 생성한다" _test_korean_nimf_desktop_created
 
 _test_korean_env_idempotent() {
     local sb; sb=$(make_sandbox)
     _load_domain "$sb"
 
     _setup_korean_env
-    local mtime1; mtime1=$(stat -c %Y "${HOME}/.config/autostart/fcitx5.desktop")
+    local mtime1; mtime1=$(stat -c %Y "${HOME}/.config/autostart/nimf.desktop")
     sleep 1
     _setup_korean_env
-    local mtime2; mtime2=$(stat -c %Y "${HOME}/.config/autostart/fcitx5.desktop")
+    local mtime2; mtime2=$(stat -c %Y "${HOME}/.config/autostart/nimf.desktop")
     assert_eq "$mtime1" "$mtime2" "멱등성"
     cleanup_sandbox "$sb"
 }
-it "멱등성 — fcitx5.desktop이 이미 있으면 덮어쓰지 않는다" _test_korean_env_idempotent
+it "멱등성 — nimf.desktop이 이미 있으면 덮어쓰지 않는다" _test_korean_env_idempotent
 
 # =============================================================================
 # _detect_and_log_gpu
