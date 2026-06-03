@@ -21,6 +21,21 @@ mkdir -p "$XDG_RUNTIME_DIR" 2>/dev/null
 chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null
 export XDG_RUNTIME_DIR
 
+_kill_x11_session() {
+    pkill -9 -f "termux-x11" 2>/dev/null || true
+    killall -9 Xwayland xfce4-session xfwm4 xfdesktop xfce4-panel \
+        xfsettingsd xfconfd xfce4-power-manager xfce4-notifyd \
+        xfce4-screensaver nimf pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+    pkill -9 -f conky 2>/dev/null || true
+    am force-stop com.termux.x11 2>/dev/null || true
+    pkill -f termux-clipboard-sync 2>/dev/null || true
+    local _w; for _w in 1 2 3; do
+        pgrep -f "termux-x11" >/dev/null 2>&1 || break
+        sleep 1
+    done
+    rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
+}
+
 # ─── X11 세션 중복 감지: X 소켓 또는 세션 프로세스가 남아 있으면 다이얼로그 ───
 # 기존 dbus-daemon 카운트 방식은 세션 1개일 때 count=1이라 > 1 조건 미충족 → 감지 실패
 # 더 직접적인 지표(X 소켓, xfce4-session, termux-x11)로 판별
@@ -31,12 +46,7 @@ _EXISTING_TX11=$(pgrep -f "termux-x11 :" 2>/dev/null | head -1 || echo "")
 if [ -n "$_EXISTING_SOCK" ] || [ -n "$_EXISTING_XFCE" ] || [ -n "$_EXISTING_TX11" ]; then
     if [ -z "$_EXISTING_TX11" ] || [ -z "$_EXISTING_XFCE" ]; then
         # stale/zombie 세션 — termux-x11 또는 xfce4-session 중 하나라도 없으면 자동 정리
-        killall -9 termux-x11 Xwayland xfce4-session xfwm4 xfdesktop xfce4-panel xfsettingsd xfconfd xfce4-power-manager xfce4-notifyd xfce4-screensaver conky nimf pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
-        pkill -f conky 2>/dev/null || true
-        am force-stop com.termux.x11 2>/dev/null || true
-        pkill -f termux-clipboard-sync 2>/dev/null || true
-        sleep 1
-        rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
+        _kill_x11_session
     else
         # live 세션 — APK를 포그라운드로 올린 뒤 다이얼로그 표시
         if [ -n "$_EXISTING_SOCK" ]; then
@@ -65,19 +75,10 @@ if [ -n "$_EXISTING_SOCK" ] || [ -n "$_EXISTING_XFCE" ] || [ -n "$_EXISTING_TX11
                 exit 0
                 ;;
             "세션 종료 후 재시작")
-                killall -9 termux-x11 Xwayland xfce4-session xfwm4 xfdesktop xfce4-panel xfsettingsd xfconfd xfce4-power-manager xfce4-notifyd xfce4-screensaver conky nimf pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
-                pkill -f conky 2>/dev/null || true
-                am force-stop com.termux.x11 2>/dev/null || true
-                pkill -f termux-clipboard-sync 2>/dev/null || true
-                sleep 1
-                rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
+                _kill_x11_session
                 ;;
             "세션 전체 종료")
-                killall -9 termux-x11 Xwayland xfce4-session xfwm4 xfdesktop xfce4-panel xfsettingsd xfconfd xfce4-power-manager xfce4-notifyd xfce4-screensaver conky nimf pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
-                pkill -f conky 2>/dev/null || true
-                am force-stop com.termux.x11 2>/dev/null || true
-                pkill -f termux-clipboard-sync 2>/dev/null || true
-                rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
+                _kill_x11_session
                 termux-wake-unlock 2>/dev/null || true
                 exit 0
                 ;;
@@ -90,13 +91,7 @@ if [ -n "$_EXISTING_SOCK" ] || [ -n "$_EXISTING_XFCE" ] || [ -n "$_EXISTING_TX11
 fi
 # ───────────────���────────────────────────────────��───────────────
 
-killall -9 termux-x11 Xwayland xfce4-session xfwm4 xfdesktop xfce4-panel xfsettingsd xfconfd xfce4-power-manager xfce4-notifyd xfce4-screensaver conky nimf pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
-pkill -f conky 2>/dev/null || true
-am force-stop com.termux.x11 2>/dev/null || true
-sleep 1
-
-# 잔류 X 소켓/락 파일 전체 삭제
-rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
+_kill_x11_session
 
 termux-wake-lock
 
@@ -203,6 +198,21 @@ script_build_kill_x11() {
 #!/data/data/com.termux/files/usr/bin/bash
 TMPDIR="${TMPDIR:-/data/data/com.termux/files/usr/tmp}"
 
+_kill_x11_session() {
+    pkill -9 -f "termux-x11" 2>/dev/null || true
+    killall -9 Xwayland xfce4-session xfwm4 xfdesktop xfce4-panel \
+        xfsettingsd xfconfd xfce4-power-manager xfce4-notifyd \
+        xfce4-screensaver nimf pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
+    pkill -9 -f conky 2>/dev/null || true
+    am force-stop com.termux.x11 2>/dev/null || true
+    pkill -f termux-clipboard-sync 2>/dev/null || true
+    local _w; for _w in 1 2 3; do
+        pgrep -f "termux-x11" >/dev/null 2>&1 || break
+        sleep 1
+    done
+    rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
+}
+
 if pgrep -f 'apt|apt-get|dpkg|nala' > /dev/null; then
     zenity --info --text="패키지 설치 중입니다. 완료 후 시도하세요."
     exit 1
@@ -217,13 +227,7 @@ if [ -z "$XFCE_PID" ] && [ -z "$TX11_PID" ]; then
     exit 0
 fi
 
-# 모든 관련 프로세스 종료 (startXFCE 정리 로직과 동일)
-killall -9 termux-x11 Xwayland xfce4-session xfwm4 xfdesktop xfce4-panel xfsettingsd xfconfd xfce4-power-manager xfce4-notifyd xfce4-screensaver conky nimf pulseaudio dbus-daemon dbus-launch 2>/dev/null || true
-pkill -f conky 2>/dev/null || true
-am force-stop com.termux.x11 2>/dev/null || true
-pkill -f termux-clipboard-sync 2>/dev/null || true
-sleep 1
-rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
+_kill_x11_session
 termux-wake-unlock 2>/dev/null || true
 EOF
 }
