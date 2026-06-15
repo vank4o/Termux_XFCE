@@ -279,112 +279,7 @@ _test_korean_env_idempotent() {
 }
 it "멱등성 — nimf.desktop이 이미 있으면 덮어쓰지 않는다" _test_korean_env_idempotent
 
-# =============================================================================
-# _detect_and_log_gpu
-# =============================================================================
-
-describe "termux_env — _detect_and_log_gpu (GPU 감지)"
-
-_test_gpu_no_kgsl() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-    reset_ui_output
-
-    # KGSL 없음 → warn
-    _detect_and_log_gpu 2>/dev/null || true
-    assert_ui_contains "WARN"
-    cleanup_sandbox "$sb"
-}
-it "KGSL 미감지 시 경고를 출력한다" _test_gpu_no_kgsl
-
-_test_gpu_adreno_7xx() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-    reset_ui_output
-
-    # sys 파일 모킹 (임시 파일로 함수 내 경로 재정의)
-    _detect_and_log_gpu_mocked() {
-        local gpu_model="Adreno (TM) 750"
-        ui_info "감지된 GPU: ${gpu_model}"
-        if [[ "$gpu_model" =~ [Aa]dreno.*7[0-9]{2} ]]; then
-            ui_info "Adreno 7xx"
-        fi
-    }
-    _detect_and_log_gpu_mocked
-    assert_ui_contains "Adreno 7xx"
-    cleanup_sandbox "$sb"
-}
-it "Adreno 7xx GPU 감지 시 7xx 메시지를 출력한다" _test_gpu_adreno_7xx
-
-_test_gpu_adreno_8xx_info() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-    reset_ui_output
-
-    _detect_and_log_gpu_mocked() {
-        local gpu_model="Adreno (TM) 830"
-        ui_info "감지된 GPU: ${gpu_model}"
-        if [[ "$gpu_model" =~ [Aa]dreno.*8[0-9]{2} ]]; then
-            ui_info "Adreno 8xx (Snapdragon 8 Elite) 감지 — Termux mesa-vulkan-icd-freedreno 26+ 사용"
-        fi
-    }
-    _detect_and_log_gpu_mocked
-    assert_ui_contains "Adreno 8xx"
-    cleanup_sandbox "$sb"
-}
-it "Adreno 8xx GPU 감지 시 8xx 정보를 출력한다" _test_gpu_adreno_8xx_info
-
-# =============================================================================
-# _setup_tur_multilib — sed '/^deb /' 패턴 검증
-# =============================================================================
-
-describe "termux_env — _setup_tur_multilib"
-
-_test_tur_multilib_only_deb_lines() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-
-    # 빈 줄·주석 포함한 tur.list 생성
-    cat > "${PREFIX}/etc/apt/sources.list.d/tur.list" << 'EOF'
-deb https://tur.kcubeterm.com tur-packages tur
-
-# this is a comment
-EOF
-
-    _setup_tur_multilib 2>/dev/null || true
-
-    local result
-    result=$(cat "${PREFIX}/etc/apt/sources.list.d/tur.list")
-
-    # deb 줄에만 추가됐는지
-    assert_output_contains "$result" "deb https://tur.kcubeterm.com tur-packages tur tur-multilib tur-hacking"
-    # 빈 줄에 붙지 않았는지
-    local blank_line
-    blank_line=$(echo "$result" | grep "^[[:space:]]*tur-multilib" || echo "none")
-    assert_eq "none" "$blank_line" "빈 줄에 tur-multilib이 붙으면 안 된다"
-    # 주석 줄에 붙지 않았는지
-    local comment_line
-    comment_line=$(echo "$result" | grep "^#.*tur-multilib" || echo "none")
-    assert_eq "none" "$comment_line" "주석 줄에 tur-multilib이 붙으면 안 된다"
-    cleanup_sandbox "$sb"
-}
-it "deb 줄에만 tur-multilib/tur-hacking을 추가한다" _test_tur_multilib_only_deb_lines
-
-_test_tur_multilib_idempotent() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-
-    echo "deb https://tur.kcubeterm.com tur-packages tur tur-multilib tur-hacking" \
-        > "${PREFIX}/etc/apt/sources.list.d/tur.list"
-
-    _setup_tur_multilib 2>/dev/null || true
-
-    local count
-    count=$(grep -c "tur-multilib" "${PREFIX}/etc/apt/sources.list.d/tur.list")
-    assert_eq "1" "$count" "멱등성: tur-multilib이 1번만 있어야 한다"
-    cleanup_sandbox "$sb"
-}
-it "멱등성 — tur-multilib이 이미 있으면 중복 추가하지 않는다" _test_tur_multilib_idempotent
+# (_detect_and_log_gpu, _setup_tur_multilib: 삭제된 함수 — 테스트 제거)
 
 # =============================================================================
 # _setup_kill_termux_x11 — bin 생성 및 desktop entry
@@ -404,7 +299,7 @@ _test_kill_x11_created() {
 }
 it "kill_termux_x11 스크립트와 desktop 파일을 생성한다" _test_kill_x11_created
 
-_test_kill_x11_idempotent() {
+_test_kill_x11_always_regenerated() {
     local sb; sb=$(make_sandbox)
     _load_domain "$sb"
 
@@ -414,10 +309,10 @@ _test_kill_x11_idempotent() {
     _setup_kill_termux_x11 2>/dev/null || true
     local mtime2; mtime2=$(stat -c %Y "${PREFIX}/bin/kill_termux_x11")
 
-    assert_eq "$mtime1" "$mtime2" "멱등성: 이미 있으면 덮어쓰지 않는다"
+    assert_ne "$mtime1" "$mtime2" "항상 재생성되어야 한다"
     cleanup_sandbox "$sb"
 }
-it "멱등성 — kill_termux_x11이 이미 있으면 덮어쓰지 않는다" _test_kill_x11_idempotent
+it "kill_termux_x11을 항상 최신 버전으로 재생성한다" _test_kill_x11_always_regenerated
 
 # =============================================================================
 # _migrate_desktop_to_prun_gui — 기존 prun → prun-gui 마이그레이션
@@ -708,7 +603,7 @@ _test_app_installer_created() {
 }
 it "app-installer bin, desktop, 바탕화면 아이콘을 생성한다" _test_app_installer_created
 
-_test_app_installer_idempotent() {
+_test_app_installer_always_regenerated() {
     local sb; sb=$(make_sandbox)
     _load_domain "$sb"
     export SCRIPT_DIR="${_REAL_PROJECT_DIR}"
@@ -719,10 +614,10 @@ _test_app_installer_idempotent() {
     _setup_app_installer
     local mtime2; mtime2=$(stat -c %Y "${PREFIX}/bin/app-installer")
 
-    assert_eq "$mtime1" "$mtime2" "멱등성: 이미 있으면 덮어쓰지 않는다"
+    assert_ne "$mtime1" "$mtime2" "bin은 항상 재생성되어야 한다 (SCRIPT_DIR 변경 반영)"
     cleanup_sandbox "$sb"
 }
-it "멱등성 — app-installer가 이미 있으면 덮어쓰지 않는다" _test_app_installer_idempotent
+it "app-installer bin을 항상 최신 버전으로 재생성한다" _test_app_installer_always_regenerated
 
 # =============================================================================
 # _install_base_packages — 패키지 설치 루프
@@ -1136,34 +1031,6 @@ _test_termux_repos_skips_already_installed() {
 }
 it "이미 설치된 repo는 건너뛰지만 pkg_update는 호출" _test_termux_repos_skips_already_installed
 
-# =============================================================================
-# _cleanup_duplicate_fcitx_autostart — 무조건 사용자 fcitx5.desktop 제거 (nimf 전환)
-# =============================================================================
-
-describe "termux_env — _cleanup_duplicate_fcitx_autostart"
-
-_test_cleanup_removes_user_fcitx5_desktop() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-    mkdir -p "${HOME}/.config/autostart"
-    touch "${HOME}/.config/autostart/fcitx5.desktop"
-
-    _cleanup_duplicate_fcitx_autostart
-
-    [ ! -f "${HOME}/.config/autostart/fcitx5.desktop" ]
-    cleanup_sandbox "$sb"
-}
-it "사용자 fcitx5.desktop을 무조건 제거한다" _test_cleanup_removes_user_fcitx5_desktop
-
-_test_cleanup_noop_when_no_file() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-
-    _cleanup_duplicate_fcitx_autostart
-
-    [ ! -f "${HOME}/.config/autostart/fcitx5.desktop" ]
-    cleanup_sandbox "$sb"
-}
-it "파일 없으면 에러 없이 no-op" _test_cleanup_noop_when_no_file
+# (_cleanup_duplicate_fcitx_autostart: 삭제된 함수 — 테스트 제거)
 
 print_results

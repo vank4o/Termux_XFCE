@@ -9,7 +9,7 @@
 # 환경변수: PROOT_DISTRO, PROOT_USER 필요
 # =============================================================================
 
-readonly PROOT_ROOTFS="$PREFIX/var/lib/proot-distro/installed-rootfs"
+[[ -v PROOT_ROOTFS ]] || readonly PROOT_ROOTFS="$PREFIX/var/lib/proot-distro/installed-rootfs"
 
 # -----------------------------------------------------------------------------
 # Public API
@@ -175,8 +175,8 @@ export MESA_VK_WSI_PRESENT_MODE=immediate  # Vulkan 프레젠테이션 레이턴
 export ZINK_DESCRIPTORS=lazy               # Zink 디스크립터 성능 최적화
 export vblank_mode=0                       # vsync 비활성화 (FPS 측정용)
 # Termux Turnip Vulkan ICD → proot Zink 백엔드 드라이버
-export VK_ICD_FILENAMES=${_vk_icd}
-export VK_DRIVER_FILES=${_vk_icd}          # Mesa 23+ 별칭
+export VK_ICD_FILENAMES="${_vk_icd}"
+export VK_DRIVER_FILES="${_vk_icd}"        # Mesa 23+ 별칭
 
 # aliases
 alias hud='GALLIUM_HUD=fps '

@@ -258,7 +258,7 @@ _test_sb_kill_checks_pkg_running() {
     local sb; sb=$(make_sandbox)
     local out="${sb}/kill_termux_x11"
     script_build_kill_x11 "$out"
-    assert_file_contains "$out" "apt\|apt-get\|dpkg\|nala"
+    assert_file_contains "$out" "\[a\]pt|\[a\]pt-get|\[d\]pkg|\[n\]ala"
     cleanup_sandbox "$sb"
 }
 it "패키지 설치 중 여부를 확인한다" _test_sb_kill_checks_pkg_running

@@ -345,23 +345,7 @@ _test_nimf_autostart_without_fcitx5_system() {
 }
 it "fcitx5 시스템 autostart 없어도 nimf autostart 생성" _test_nimf_autostart_without_fcitx5_system
 
-_test_cleanup_removes_fcitx5_user_autostart() {
-    local sb; sb=$(make_sandbox)
-    _load_domain "$sb"
-
-    mkdir -p "$HOME/.config/autostart"
-    echo "[Desktop Entry]" > "$HOME/.config/autostart/fcitx5.desktop"
-
-    _cleanup_duplicate_fcitx_autostart
-
-    if [ -f "$HOME/.config/autostart/fcitx5.desktop" ]; then
-        echo "[ASSERT] fcitx5 사용자 autostart가 제거되지 않음" >&2
-        return 1
-    fi
-
-    cleanup_sandbox "$sb"
-}
-it "마이그레이션 — fcitx5 사용자 autostart 제거" _test_cleanup_removes_fcitx5_user_autostart
+# (_cleanup_duplicate_fcitx_autostart: 삭제된 함수 — 테스트 제거)
 
 # =============================================================================
 # Regression #5: conky backend 설정

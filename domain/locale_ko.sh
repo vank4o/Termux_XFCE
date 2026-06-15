@@ -11,6 +11,7 @@
 
 # FALLBACK_DOMAINS — force_gettext.so가 후킹할 gettext 도메인 목록
 # setup_korean_rc (termux_env.sh), script_builder_zenity.sh에서도 참조
+if [[ ! -v _KOREAN_FALLBACK_DOMAINS ]]; then
 readonly _KOREAN_FALLBACK_DOMAINS="\
 mousepad xfce4-terminal thunar ristretto \
 gtk30 glib20 gdk-pixbuf libxfce4ui-2 libxfce4util exo garcon \
@@ -20,6 +21,7 @@ gimp30-plugins gegl-0.4 babl inkscape \
 vlc kdenlive kxmlgui6 kwidgetsaddons6 kconfigwidgets6 kcoreaddons6 \
 kitemviews6 kiconthemes6 kio6 sonnet6 knewstuff6 ktextwidgets6 \
 knotifications6 kservice6 solid6 kguiaddons6 kcolorscheme6"
+fi
 
 # 옵트인: app-installer 또는 KOREAN_LOCALE_ZIP 환경변수로 호출
 setup_korean_locale_native() {
@@ -62,8 +64,8 @@ _deploy_locale_catalogs() {
     fi
 
     # 기존 locale 백업 (Termux 기본 locale은 비어있는 경우가 많지만 안전하게)
-    if [ -d "$dest" ] && [ ! -d "$dest.bak" ]; then
-        mv "$dest" "$dest.bak.$(date +%s)"
+    if [ -d "$dest" ] && ! compgen -G "${dest}.bak."* > /dev/null 2>&1; then
+        mv "$dest" "${dest}.bak.$(date +%s)"
     fi
 
     mkdir -p "$dest"

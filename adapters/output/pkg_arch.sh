@@ -8,8 +8,7 @@
 # =============================================================================
 
 # Termux native + proot 공통 (라이프사이클, 실행 함수)
-ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$ADAPTER_DIR/pkg_common_proot.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/pkg_common_proot.sh"
 
 # -----------------------------------------------------------------------------
 # proot (Arch Linux 내부) 패키지 관리

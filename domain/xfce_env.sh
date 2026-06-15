@@ -7,7 +7,7 @@
 # - 테마, 폰트, 배경화면, fancybash
 # =============================================================================
 
-readonly REPO_BASE="https://github.com/yanghoeg/Termux_XFCE/raw/main"
+[[ -v REPO_BASE ]] || readonly REPO_BASE="https://github.com/yanghoeg/Termux_XFCE/raw/main"
 
 # -----------------------------------------------------------------------------
 # Public API
@@ -106,45 +106,51 @@ _install_whitesur_theme() {
     local theme_dir="$PREFIX/share/themes/WhiteSur-Dark"
     [ -d "$theme_dir" ] && return 0  # 멱등성
 
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    trap "rm -rf '$tmpdir'" RETURN
+
     local zip="2024-11-18.zip"
-    # 잔류 파일 정리 후 다운로드
-    rm -rf "WhiteSur-gtk-theme-2024-11-18" "WhiteSur-Dark" "$zip"
-    wget -q "https://github.com/vinceliuice/WhiteSur-gtk-theme/archive/refs/tags/${zip}" -O "$zip" \
-        || { ui_warn "WhiteSur 테마 다운로드 실패"; rm -f "$zip"; return 1; }
-    unzip -o -q "$zip" \
-        || { ui_warn "WhiteSur 테마 압축 해제 실패"; rm -f "$zip"; return 1; }
-    tar -xf "WhiteSur-gtk-theme-2024-11-18/release/WhiteSur-Dark.tar.xz" \
-        || { ui_warn "WhiteSur 테마 tar 해제 실패"; rm -rf "WhiteSur-gtk-theme-2024-11-18" "$zip"; return 1; }
-    mv WhiteSur-Dark/ "$PREFIX/share/themes/"
-    rm -rf "WhiteSur-gtk-theme-2024-11-18" "$zip"
+    wget -q "https://github.com/vinceliuice/WhiteSur-gtk-theme/archive/refs/tags/${zip}" -O "$tmpdir/$zip" \
+        || { ui_warn "WhiteSur 테마 다운로드 실패"; return 1; }
+    unzip -o -q "$tmpdir/$zip" -d "$tmpdir" \
+        || { ui_warn "WhiteSur 테마 압축 해제 실패"; return 1; }
+    tar -xf "$tmpdir/WhiteSur-gtk-theme-2024-11-18/release/WhiteSur-Dark.tar.xz" -C "$tmpdir" \
+        || { ui_warn "WhiteSur 테마 tar 해제 실패"; return 1; }
+    mv "$tmpdir/WhiteSur-Dark/" "$PREFIX/share/themes/"
 }
 
 _install_fluent_cursor() {
     local cursor_dir="$PREFIX/share/icons/dist-dark"
     [ -d "$cursor_dir" ] && return 0  # 멱등성
 
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    trap "rm -rf '$tmpdir'" RETURN
+
     local zip="2024-02-25.zip"
-    rm -rf "Fluent-icon-theme-2024-02-25" "$zip"
-    wget -q "https://github.com/vinceliuice/Fluent-icon-theme/archive/refs/tags/${zip}" -O "$zip" \
-        || { ui_warn "Fluent 커서 다운로드 실패"; rm -f "$zip"; return 1; }
-    unzip -o -q "$zip" \
-        || { ui_warn "Fluent 커서 압축 해제 실패"; rm -f "$zip"; return 1; }
-    mv "Fluent-icon-theme-2024-02-25/cursors/dist"      "$PREFIX/share/icons/"
-    mv "Fluent-icon-theme-2024-02-25/cursors/dist-dark" "$PREFIX/share/icons/"
-    rm -rf "Fluent-icon-theme-2024-02-25" "$zip"
+    wget -q "https://github.com/vinceliuice/Fluent-icon-theme/archive/refs/tags/${zip}" -O "$tmpdir/$zip" \
+        || { ui_warn "Fluent 커서 다운로드 실패"; return 1; }
+    unzip -o -q "$tmpdir/$zip" -d "$tmpdir" \
+        || { ui_warn "Fluent 커서 압축 해제 실패"; return 1; }
+    mv "$tmpdir/Fluent-icon-theme-2024-02-25/cursors/dist"      "$PREFIX/share/icons/"
+    mv "$tmpdir/Fluent-icon-theme-2024-02-25/cursors/dist-dark" "$PREFIX/share/icons/"
 }
 
 _install_cascadia_code() {
     [ -f "$HOME/.fonts/CascadiaCode.otf" ] && return 0
 
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    trap "rm -rf '$tmpdir'" RETURN
+
     local zip="CascadiaCode-2111.01.zip"
-    wget -q "https://github.com/microsoft/cascadia-code/releases/download/v2111.01/${zip}" -O "$zip" \
-        || { ui_warn "CascadiaCode 폰트 다운로드 실패"; rm -f "$zip"; return 1; }
-    unzip -q "$zip" \
-        || { ui_warn "CascadiaCode 폰트 압축 해제 실패"; rm -f "$zip"; return 1; }
-    mv otf/static/*.otf "$HOME/.fonts/" 2>/dev/null || true
-    mv ttf/*.ttf       "$HOME/.fonts/" 2>/dev/null || true
-    rm -rf otf/ ttf/ woff2/ "$zip"
+    wget -q "https://github.com/microsoft/cascadia-code/releases/download/v2111.01/${zip}" -O "$tmpdir/$zip" \
+        || { ui_warn "CascadiaCode 폰트 다운로드 실패"; return 1; }
+    unzip -q "$tmpdir/$zip" -d "$tmpdir" \
+        || { ui_warn "CascadiaCode 폰트 압축 해제 실패"; return 1; }
+    mv "$tmpdir/otf/static/"*.otf "$HOME/.fonts/" 2>/dev/null || true
+    mv "$tmpdir/ttf/"*.ttf       "$HOME/.fonts/" 2>/dev/null || true
 }
 
 _install_meslo_nerd() {
@@ -152,12 +158,15 @@ _install_meslo_nerd() {
     # (family: "MesloLGS Nerd Font" / "MesloLGS Nerd Font Mono")
     [ -f "$HOME/.fonts/MesloLGSNerdFont-Regular.ttf" ] && return 0
 
-    wget -q "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/Meslo.zip" -O Meslo.zip \
-        || { ui_warn "Meslo Nerd Font 다운로드 실패"; rm -f Meslo.zip; return 1; }
-    unzip -q Meslo.zip -d meslo_tmp \
-        || { ui_warn "Meslo Nerd Font 압축 해제 실패"; rm -f Meslo.zip; return 1; }
-    mv meslo_tmp/*.ttf "$HOME/.fonts/" 2>/dev/null || true
-    rm -rf meslo_tmp/ Meslo.zip LICENSE.txt readme.md 2>/dev/null || true
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    trap "rm -rf '$tmpdir'" RETURN
+
+    wget -q "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.2.1/Meslo.zip" -O "$tmpdir/Meslo.zip" \
+        || { ui_warn "Meslo Nerd Font 다운로드 실패"; return 1; }
+    unzip -q "$tmpdir/Meslo.zip" -d "$tmpdir/meslo_tmp" \
+        || { ui_warn "Meslo Nerd Font 압축 해제 실패"; return 1; }
+    mv "$tmpdir/meslo_tmp/"*.ttf "$HOME/.fonts/" 2>/dev/null || true
 }
 
 _install_noto_emoji() {

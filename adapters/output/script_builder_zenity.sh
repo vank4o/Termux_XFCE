@@ -131,11 +131,14 @@ fi
 XDISPLAY=":${DISPLAY_NUM}"
 echo "Detected DISPLAY=${XDISPLAY}"
 
-LD_PRELOAD=/system/lib64/libskcodec.so pulseaudio --start \
+_PA_PRELOAD=""
+[ -f /system/lib64/libskcodec.so ] && _PA_PRELOAD="/system/lib64/libskcodec.so"
+
+LD_PRELOAD="\$_PA_PRELOAD" pulseaudio --start \
     --load="module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1" \
     --exit-idle-time=-1
 
-LD_PRELOAD=/system/lib64/libskcodec.so pacmd load-module \
+LD_PRELOAD="\$_PA_PRELOAD" pacmd load-module \
     module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1 2>/dev/null || true
 
 # 한글 로케일 — force_gettext.so가 설치되어 있으면 자동 적용
@@ -213,7 +216,7 @@ _kill_x11_session() {
     rm -f "${TMPDIR}/.X11-unix/X"* "${TMPDIR}/.X"*"-lock" 2>/dev/null || true
 }
 
-if pgrep -f 'apt|apt-get|dpkg|nala' > /dev/null; then
+if pgrep -f '[a]pt|[a]pt-get|[d]pkg|[n]ala' > /dev/null; then
     zenity --info --text="패키지 설치 중입니다. 완료 후 시도하세요."
     exit 1
 fi
