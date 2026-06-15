@@ -19,8 +19,10 @@ parse_cli_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --distro|-d)
+                [[ $# -ge 2 ]] || { echo "[ERROR] $1 옵션에 값이 필요합니다" >&2; exit 1; }
                 PROOT_DISTRO="$2"; shift 2 ;;
             --user|-u)
+                [[ $# -ge 2 ]] || { echo "[ERROR] $1 옵션에 값이 필요합니다" >&2; exit 1; }
                 PROOT_USER="$2"; shift 2 ;;
             --no-proot)
                 SKIP_PROOT=true; shift ;;

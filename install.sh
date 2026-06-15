@@ -120,6 +120,8 @@ source "$SCRIPT_DIR/domain/xfce_env.sh"
 source "$SCRIPT_DIR/domain/locale_ko.sh"
 source "$SCRIPT_DIR/domain/proot_env.sh"
 
+_pkg_manager_check
+
 # 테스트 훅: 모든 source 이후, 실제 설치 전에 setup_* 함수를 스텁으로 교체할 수 있는 지점
 # (테스트 매트릭스가 dispatch 로직만 검증하고 실제 설치 수행은 안 하기 위함)
 if [ -n "${_INSTALL_HOOK:-}" ] && [ -f "${_INSTALL_HOOK}" ]; then
@@ -247,4 +249,4 @@ ui_info ""
 ui_info "⚠ Termux:API, Termux:Float APK를 설치 화면에서 확인하세요"
 ui_info "=================================================="
 
-termux-reload-settings
+termux-reload-settings 2>/dev/null || true

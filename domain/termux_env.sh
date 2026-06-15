@@ -130,11 +130,13 @@ _append_to_rc() {
     local content="$2"
     local file="$3"
     [ -f "$file" ] || return 0  # 파일 없으면 건너뜀 (silent failure 방지)
-    grep -q "$marker" "$file" 2>/dev/null || printf '%s\n' "$content" >> "$file"
+    grep -qF "$marker" "$file" 2>/dev/null || printf '%s\n' "$content" >> "$file"
 }
 
 _setup_termux_properties() {
     local props="$HOME/.termux/termux.properties"
+    mkdir -p "$(dirname "$props")"
+    [ -f "$props" ] || touch "$props"
     if ! grep -q "^allow-external-apps = true" "$props" 2>/dev/null; then
         sed -i 's/# allow-external-apps = true/allow-external-apps = true/g' "$props"
         # sed 대상 주석이 없었을 경우 직접 추가
@@ -153,13 +155,6 @@ _setup_termux_repos() {
     pkg_is_installed "x11-repo"  || pkg_install x11-repo
     pkg_is_installed "tur-repo"  || pkg_install tur-repo
     pkg_is_installed "root-repo" || pkg_install root-repo
-    pkg_update
-}
-
-_setup_tur_multilib() {
-    local tur_list="$PREFIX/etc/apt/sources.list.d/tur.list"
-    grep -q "tur-multilib" "$tur_list" 2>/dev/null || \
-        sed -i '/^deb /s/$/ tur-multilib tur-hacking/' "$tur_list"
     pkg_update
 }
 
@@ -449,14 +444,10 @@ _install_nimf_native() {
 
     ui_info "nimf 한글 입력기 설치 중..."
     wget -q "$url" -O "$deb" || { ui_warn "nimf deb 다운로드 실패"; return 1; }
-    dpkg -i --force-overwrite "$deb" 2>/dev/null
+    dpkg -i --force-overwrite "$deb" 2>/dev/null || true
     apt --fix-broken install -y 2>/dev/null || true
     rm -f "$deb"
     glib-compile-schemas "${PREFIX}/share/glib-2.0/schemas/" 2>/dev/null || true
-}
-
-_cleanup_duplicate_fcitx_autostart() {
-    rm -f "$HOME/.config/autostart/fcitx5.desktop"
 }
 
 _setup_start_xfce() {
@@ -465,47 +456,6 @@ _setup_start_xfce() {
     script_build_start_xfce "$shortcut"
     chmod +x "$shortcut"
     ln -sf "$shortcut" "$PREFIX/bin/startXFCE"
-}
-
-# GPU 모델 감지 및 로그 출력
-_detect_and_log_gpu() {
-    local gpu_model
-    gpu_model=$(cat /sys/class/kgsl/kgsl-3d0/gpu_model 2>/dev/null || echo "")
-
-    if [ -z "$gpu_model" ]; then
-        ui_warn "KGSL GPU 미감지 (비-Adreno 기기이거나 /dev/kgsl-3d0 접근 불가)"
-        # Mali 등 비-Adreno GPU 안내
-        if [ -d /sys/class/misc/mali0 ] || [ -c /dev/mali0 ]; then
-            ui_warn "Mali GPU 감지 — mesa-zink + GALLIUM_DRIVER=zink 시도 가능"
-            ui_warn "단, Mali용 Vulkan ICD가 없으면 llvmpipe로 폴백됩니다."
-            ui_warn "시도: pkg install mesa && GALLIUM_DRIVER=zink glxinfo | grep renderer"
-        else
-            ui_warn "→ llvmpipe 소프트웨어 렌더링으로 실행됩니다."
-        fi
-        return 0
-    fi
-
-    ui_info "감지된 GPU: ${gpu_model}"
-
-    # DRI3 접근 가능 여부 — Termux:X11 nightly APK DRI3 지원 필요
-    if [ -r /dev/dri/renderD128 ]; then
-        ui_info "DRI3 활성 — Zink+Turnip X11 직접 렌더링 가능"
-    else
-        ui_warn "DRI3 비활성 (/dev/dri/renderD128 접근 불가)"
-        ui_warn "→ Termux:X11 nightly APK를 최신 버전으로 업데이트하세요"
-        ui_warn "  미업데이트 시: glmark2 크래시, glmark2-es2 검정화면"
-    fi
-
-    # Adreno 세대별 안내
-    if [[ "$gpu_model" =~ [Aa]dreno.*8[0-9]{2} ]]; then
-        ui_info "Adreno 8xx (Snapdragon 8 Elite) 감지 — Termux mesa-vulkan-icd-freedreno 26+ 사용"
-    elif [[ "$gpu_model" =~ [Aa]dreno.*7[0-9]{2} ]]; then
-        ui_info "Adreno 7xx (Snapdragon 8 Gen1~3) 감지 — KGSL 드라이버 최적 지원"
-    elif [[ "$gpu_model" =~ [Aa]dreno.*6[0-9]{2} ]]; then
-        ui_info "Adreno 6xx 감지 — KGSL 드라이버 지원"
-    else
-        ui_warn "미확인 GPU 모델: ${gpu_model} — Zink 폴백 권장"
-    fi
 }
 
 _setup_kill_termux_x11() {
@@ -625,17 +575,16 @@ _setup_app_installer() {
     local bin="$PREFIX/bin/app-installer"
     local desktop="$PREFIX/share/applications/app-installer.desktop"
 
-    if [ ! -f "$bin" ]; then
-        # SCRIPT_DIR은 install.sh 실행 시점 기준 — curl-pipe(~/.termux-xfce-installer),
-        # 수동 clone(~/Termux_XFCE) 양쪽 모두 정확한 경로를 기록한다.
-        cat > "$bin" << EOF
+    # SCRIPT_DIR은 install.sh 실행 시점 기준 — curl-pipe(~/.termux-xfce-installer),
+    # 수동 clone(~/Termux_XFCE) 양쪽 모두 정확한 경로를 기록한다.
+    # 항상 재생성하여 SCRIPT_DIR 변경을 반영한다.
+    cat > "$bin" << EOF
 #!/data/data/com.termux/files/usr/bin/bash
 # GTK4 zenity: Zink+Turnip GLX 스왑체인 크래시 방지
 export GSK_RENDERER=cairo
 exec bash ${SCRIPT_DIR}/app-installer/install.sh "\$@"
 EOF
-        chmod +x "$bin"
-    fi
+    chmod +x "$bin"
 
     if [ ! -f "$desktop" ]; then
         mkdir -p "$PREFIX/share/applications"
@@ -674,7 +623,6 @@ EOF
 
 _setup_cp2menu() {
     local bin="$PREFIX/bin/cp2menu"
-    [ -f "$bin" ] && return 0
 
     mkdir -p "$PREFIX/share/applications"
     script_build_cp2menu "$bin"

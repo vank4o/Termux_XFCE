@@ -7,8 +7,7 @@
 # =============================================================================
 
 # Termux native 패키지 관리 (공통)
-ADAPTER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$ADAPTER_DIR/pkg_common_termux.sh"
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/pkg_common_termux.sh"
 
 # -----------------------------------------------------------------------------
 # proot 미지원 stub — native-only 모드에서 호출 시 에러

@@ -11,8 +11,10 @@ pkg_update() {
     # Why: tur.kcubeterm.com 등 외부 미러 동기화 지연이 전체 설치를 중단시키는 일을 방지.
     local tmplog exit_code
     tmplog=$(mktemp)
+    set +o pipefail
     pkg update -y -o Dpkg::Options::="--force-confold" 2>&1 | tee "$tmplog"
     exit_code=${PIPESTATUS[0]}
+    set -o pipefail
     if [ $exit_code -ne 0 ]; then
         if grep -q "Some index files failed to download" "$tmplog" && \
            ! grep -qE "Could not get lock|Unable to lock|dpkg was interrupted" "$tmplog"; then
