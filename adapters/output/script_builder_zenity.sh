@@ -72,16 +72,29 @@ fi
 
 LOCALE
 
-        # ── 7. 클립보드 동기화 (display 어댑터) ──
+        # ── 7. nimf 한글 입력기 (공유) ──
+        cat << 'NIMF'
+# nimf 입력기 — 설치되어 있으면 세션 전체에 적용
+if command -v nimf >/dev/null 2>&1; then
+    export XMODIFIERS="@im=nimf"
+    export GTK_IM_MODULE=nimf
+    export QT_IM_MODULE=nimf
+fi
+
+NIMF
+
+        # ── 8. 클립보드 동기화 (display 어댑터) ──
         display_emit_clipboard_sync
 
-        # ── 8. GPU 감지 + XFCE 세션 시작 (공유) ──
+        # ── 9. GPU 감지 + XFCE 세션 시작 (공유) ──
         cat << 'GPU_SESSION'
 
 GPU_MODEL=$(cat /sys/class/kgsl/kgsl-3d0/gpu_model 2>/dev/null || echo "")
 
 if [ -n "$GPU_MODEL" ]; then
     # Adreno GPU 감지 → Zink(OpenGL→Vulkan) + Turnip
+    # xfwm4 컴포지터가 검은 화면 유발 시:
+    #   설정 → 창관리자(작업) → 컴포지터 → '화면 컴포지팅 활성화' 해제
     env DISPLAY="$XDISPLAY" \
         PULSE_SERVER=tcp:127.0.0.1:4713 \
         MESA_LOADER_DRIVER_OVERRIDE=zink \
