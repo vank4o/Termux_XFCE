@@ -31,6 +31,17 @@ setup_xfce_packages() {
         fi
     done
 
+    # 디스플레이 서버 패키지 설치
+    local _dp
+    for _dp in $(display_get_packages); do
+        if pkg_is_installed "$_dp"; then
+            ui_info "  ${_dp} — 이미 설치됨 (display)"
+        else
+            ui_info "  ${_dp} 설치 중... (display)"
+            pkg_install "$_dp"
+        fi
+    done
+
     # Firefox 데스크탑 아이콘
     local firefox_desktop="$HOME/Desktop/firefox.desktop"
     [ -f "$firefox_desktop" ] || \

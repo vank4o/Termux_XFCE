@@ -20,7 +20,7 @@ PKGS_TERMUX_BASE=(
     pulseaudio
     yad            # app-installer 검색 가능 GUI (zenity 대체)
     termux-api     # Android API 브리지 (클립보드, 알림, 배터리 등)
-    xclip          # X11 클립보드 — Android↔XFCE 동기화용
+    # xclip: display 어댑터(display_get_packages)로 이동
 )
 
 # XFCE 데스크탑 환경
@@ -30,13 +30,12 @@ PKGS_TERMUX_XFCE=(
     firefox
     flameshot          # 스크린샷 — native 필수 (proot에선 dbus EXTERNAL auth UID 불일치로 작동 불가)
     papirus-icon-theme
-    termux-x11-nightly
+    # termux-x11-nightly, wmctrl: display 어댑터(display_get_packages)로 이동
     libuv
-    wmctrl
     pavucontrol-qt
     fontconfig-utils   # fc-cache/fc-match: Nerd Font 폰트 캐시 갱신용 (xfce 의존성에 미포함)
     libsimdutf         # libvte(xfce4-terminal) 런타임 의존성 (Termux 26.x+에서 자동 pull 안 됨)
-    xdotool            # X11 입력 자동화 — Alt 키 고착 해제, 입력 리셋용
+    # xdotool: display 어댑터(display_get_packages)로 이동
 )
 
 # CLI 강화 도구

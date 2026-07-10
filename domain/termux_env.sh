@@ -32,7 +32,7 @@ setup_termux_base() {
 setup_termux_shortcuts() {
     ui_info "Termux 단축키(startXFCE) 설정"
     _setup_start_xfce
-    _setup_kill_termux_x11
+    _setup_kill_display
     _setup_prun
     _setup_prun_gui
     _setup_cp2menu
@@ -65,24 +65,8 @@ _download_and_open_apk() {
         ui_warn "APK 자동 열기 실패 — 수동으로 설치하세요: ${apk_path}"
 }
 
-setup_termux_x11_apk() {
-    local arch
-    arch=$(uname -m)
-    local apk_name
 
-    case "$arch" in
-        aarch64) apk_name="app-arm64-v8a-debug.apk" ;;
-        x86_64)  apk_name="app-x86_64-debug.apk" ;;
-        *)
-            ui_warn "아키텍처 ${arch}용 Termux-X11 APK를 지원하지 않습니다. 수동 설치하세요."
-            return 0
-            ;;
-    esac
-
-    _download_and_open_apk \
-        "https://github.com/termux/termux-x11/releases/download/nightly/${apk_name}" \
-        "$apk_name"
-}
+# setup_termux_x11_apk: display_x11.sh:display_setup_apk()로 이동됨
 
 setup_termux_api_apk() {
     _download_and_open_apk \
@@ -458,20 +442,19 @@ _setup_start_xfce() {
     ln -sf "$shortcut" "$PREFIX/bin/startXFCE"
 }
 
-_setup_kill_termux_x11() {
-    local bin="$PREFIX/bin/kill_termux_x11"
+_setup_kill_display() {
+    local bin="$PREFIX/bin/kill_display_session"
 
     mkdir -p "$PREFIX/share/applications"
-    script_build_kill_x11 "$bin"
+    script_build_kill_display "$bin"
     chmod +x "$bin"
 
-    # Desktop entry
-    cat > "$PREFIX/share/applications/kill_termux_x11.desktop" << 'EOF'
+    cat > "$PREFIX/share/applications/kill_display_session.desktop" << 'EOF'
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Kill Termux X11
-Exec=kill_termux_x11
+Name=Kill Display Session
+Exec=kill_display_session
 Icon=system-shutdown
 Categories=System;
 StartupNotify=false

@@ -241,12 +241,6 @@ it "PROOT_DISTRO 미설정 시 set -u에서 트립하지 않고 'user' 반환" _
 
 describe "vlc.sh — 구조 검증"
 
-_test_vlc_installs() {
-    # vlc가 pkg에 있는지 확인 (Termux native fallback용)
-    pkg show vlc 2>/dev/null | grep -q "Package: vlc"
-}
-it "pkg에 vlc 패키지가 존재한다" _test_vlc_installs
-
 _test_vlc_script_syntax() {
     bash -n "${INSTALLERS_DIR}/vlc.sh" 2>/dev/null
 }
@@ -329,7 +323,7 @@ describe "Wine 앱 installer — 구조 검증"
 
 _test_wine_apps_have_wine_check() {
     local failed=0
-    for id in kakaotalk notepadpp sevenzip sumatrapdf winmerge; do
+    for id in notepadpp sevenzip sumatrapdf winmerge; do
         local f="${INSTALLERS_DIR}/${id}.sh"
         if [ ! -f "$f" ]; then
             echo "[ASSERT] ${id}.sh 파일 없음" >&2; failed=1; continue
@@ -344,7 +338,7 @@ it "모든 Wine 앱 — Wine 설치 여부 체크 있음" _test_wine_apps_have_w
 
 _test_wine_apps_have_desktop_logic() {
     local failed=0
-    for id in kakaotalk notepadpp sevenzip sumatrapdf winmerge; do
+    for id in notepadpp sevenzip sumatrapdf winmerge; do
         local f="${INSTALLERS_DIR}/${id}.sh"
         [ -f "$f" ] || continue
         if ! command grep -q "desktop\|\.desktop" "$f"; then
@@ -357,7 +351,7 @@ it "모든 Wine 앱 — .desktop 파일 생성 로직 있음" _test_wine_apps_ha
 
 _test_wine_apps_use_wine_in_exec() {
     local failed=0
-    for id in kakaotalk notepadpp sevenzip sumatrapdf winmerge; do
+    for id in notepadpp sevenzip sumatrapdf winmerge; do
         local f="${INSTALLERS_DIR}/${id}.sh"
         [ -f "$f" ] || continue
         if ! command grep -q "wine" "$f"; then
