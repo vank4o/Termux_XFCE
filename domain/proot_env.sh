@@ -195,6 +195,7 @@ setup_proot_timezone() {
     ui_info "${PROOT_DISTRO} 시간대 설정"
     local tz
     tz=$(getprop persist.sys.timezone 2>/dev/null || echo "Asia/Seoul")
+    tz="${tz:-Asia/Seoul}"
 
     # /etc/localtime는 root 소유 → proot_exec_root 사용
     proot_exec_root rm -f /etc/localtime
@@ -447,10 +448,20 @@ _install_ubuntu_nimf_deb() {
     local deb url
     for deb in "${NIMF_DEBS[@]}"; do
         url="${NIMF_DEB_BASE_URL}/${deb}"
-        proot_exec bash -c "wget -q -O '/tmp/${deb}' '${url}' && sudo dpkg -i '/tmp/${deb}' 2>/dev/null || true; rm -f '/tmp/${deb}'"
+        proot_exec bash -c "
+            if wget -q -O '/tmp/${deb}' '${url}' && [ -s '/tmp/${deb}' ]; then
+                sudo dpkg -i '/tmp/${deb}' 2>/dev/null || true
+            else
+                echo '[WARN] ${deb} 다운로드 실패' >&2
+            fi
+            rm -f '/tmp/${deb}'
+        "
     done
 
     proot_exec bash -c "sudo apt-get install -f -y 2>/dev/null || true"
+
+    proot_exec bash -c "command -v nimf &>/dev/null" || \
+        ui_warn "nimf 설치 실패 — 한글 입력기가 동작하지 않을 수 있습니다"
 }
 
 _setup_ubuntu_nimf() {
@@ -492,12 +503,14 @@ _setup_arch_nimf_or_fcitx5() {
 
 _install_yay() {
     proot_exec bash -c "
+        set -e
         command -v yay &>/dev/null && exit 0
         sudo pacman -S --noconfirm --needed git base-devel
         git clone https://aur.archlinux.org/yay-bin.git /tmp/yay-bin
         cd /tmp/yay-bin && makepkg -si --noconfirm
         rm -rf /tmp/yay-bin
     "
+    proot_exec bash -c "command -v yay &>/dev/null"
 }
 
 _write_arch_im_env() {

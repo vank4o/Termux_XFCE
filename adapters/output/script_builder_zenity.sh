@@ -190,6 +190,7 @@ if [[ "$action" == "Copy .desktop file" ]]; then
     app_name=$(grep -m1 '^Name=' "$PREFIX/share/applications/$filename" | cut -d= -f2-)
     app_name="${app_name:-App}"
     # sed 구분자(|)와 작은따옴표 충돌 방지
+    app_name="${app_name//\\/\\\\}"
     app_name="${app_name//\'/\'\\\'\'}"
     app_name="${app_name//&/\\&}"
     app_name="${app_name//|/\\|}"
