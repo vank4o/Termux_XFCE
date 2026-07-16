@@ -61,6 +61,12 @@ PKGS_TERMUX_CLI=(
     dust        # du 시각화 — 스토리지 확인
     duf         # df 현대적 대체
     yazi        # Rust 비동기 터미널 파일매니저 (이미지 프리뷰)
+    procs       # ps 현대적 대체 — 컬러/트리 뷰
+    ncdu        # 디스크 사용량 드릴다운 TUI (duf/dust 보완)
+    glow        # 터미널 마크다운 렌더러 (README·AI 출력 읽기)
+    tealdeer    # tldr — 명령어 치트시트 (man 빠른 조회)
+    xh          # HTTPie 호환 HTTP 클라이언트 (curl 대체)
+    onefetch    # git 저장소 요약 (neofetch의 repo판)
 )
 
 # proot-distro 설치에 필요한 Termux 패키지
