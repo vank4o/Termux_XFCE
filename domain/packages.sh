@@ -52,6 +52,7 @@ PKGS_TERMUX_CLI=(
     starship
     atuin
     htop
+    btop        # 시각적 리소스 모니터 (htop 후속, root-repo 제공)
     jq
     netcat-openbsd
     neofetch
@@ -59,6 +60,7 @@ PKGS_TERMUX_CLI=(
     zellij      # tmux 대안 — 세션 멀티플렉서
     dust        # du 시각화 — 스토리지 확인
     duf         # df 현대적 대체
+    yazi        # Rust 비동기 터미널 파일매니저 (이미지 프리뷰)
 )
 
 # proot-distro 설치에 필요한 Termux 패키지
