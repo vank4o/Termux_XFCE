@@ -9,7 +9,7 @@
 # 환경변수: PROOT_DISTRO, PROOT_USER 필요
 # =============================================================================
 
-[[ -v PROOT_ROOTFS ]] || readonly PROOT_ROOTFS="$PREFIX/var/lib/proot-distro/installed-rootfs"
+[[ -v PROOT_ROOTFS ]] || readonly PROOT_ROOTFS="${PREFIX}/var/lib/proot-distro/containers/${PROOT_DISTRO}/rootfs"
 
 # -----------------------------------------------------------------------------
 # Public API
@@ -35,7 +35,7 @@ setup_proot_install() {
     fi
 
     # 이미 설치된 경우 건너뜀
-    [ -d "${PROOT_ROOTFS}/${PROOT_DISTRO}" ] && {
+    [ -d "${PREFIX}/var/lib/proot-distro/containers/${PROOT_DISTRO}" ] && {
         ui_warn "${PROOT_DISTRO}가 이미 설치되어 있습니다. 건너뜁니다."
         return 0
     }
@@ -52,7 +52,7 @@ setup_proot_user() {
     local username="$PROOT_USER"
     ui_info "${PROOT_DISTRO} 사용자 생성: ${username}"
 
-    local home_dir="${PROOT_ROOTFS}/${PROOT_DISTRO}/home/${username}"
+    local home_dir="${PROOT_ROOTFS}/home/${username}"
     [ -d "$home_dir" ] && {
         ui_warn "사용자 ${username}이 이미 존재합니다. 건너뜁니다."
         return 0
@@ -153,7 +153,7 @@ setup_proot_korean() {
 
 setup_proot_env() {
     ui_info "${PROOT_DISTRO} 환경변수 설정"
-    local bashrc="${PROOT_ROOTFS}/${PROOT_DISTRO}/home/${PROOT_USER}/.bashrc"
+    local bashrc="${PROOT_ROOTFS}/home/${PROOT_USER}/.bashrc"
 
     grep -q "# termux-xfce-proot-env" "$bashrc" 2>/dev/null && return 0
 
@@ -205,12 +205,12 @@ setup_proot_fancybash() {
     local username="$PROOT_USER"
     ui_info "${PROOT_DISTRO} 프롬프트 설정"
 
-    local dst="${PROOT_ROOTFS}/${PROOT_DISTRO}/home/${username}/.fancybash.sh"
+    local dst="${PROOT_ROOTFS}/home/${username}/.fancybash.sh"
     [ -f "$dst" ] && return 0  # 멱등성
 
     _generate_proot_fancybash "$dst"
 
-    local bashrc="${PROOT_ROOTFS}/${PROOT_DISTRO}/home/${username}/.bashrc"
+    local bashrc="${PROOT_ROOTFS}/home/${username}/.bashrc"
     grep -q "source.*\.fancybash\.sh" "$bashrc" 2>/dev/null || \
         echo "source ~/.fancybash.sh" >> "$bashrc"
 }
@@ -237,7 +237,7 @@ setup_proot_hardware_accel() {
 setup_proot_cursor_theme() {
     ui_info "${PROOT_DISTRO} 커서 테마(dist-dark) 적용"
     local src="$PREFIX/share/icons/dist-dark"
-    local dst="${PROOT_ROOTFS}/${PROOT_DISTRO}/usr/share/icons/dist-dark"
+    local dst="${PROOT_ROOTFS}/usr/share/icons/dist-dark"
 
     [ -d "$dst" ] && return 0
 
@@ -256,7 +256,7 @@ setup_proot_cursor_theme() {
 
     cp -r "$src" "$dst"
 
-    local xresources="${PROOT_ROOTFS}/${PROOT_DISTRO}/home/${PROOT_USER}/.Xresources"
+    local xresources="${PROOT_ROOTFS}/home/${PROOT_USER}/.Xresources"
     grep -q "Xcursor.theme" "$xresources" 2>/dev/null || \
         echo "Xcursor.theme: dist-dark" >> "$xresources"
 }
@@ -264,7 +264,7 @@ setup_proot_cursor_theme() {
 setup_proot_conky() {
     ui_info "${PROOT_DISTRO} Conky 설정 복사"
     local username="$PROOT_USER"
-    local config_dst="${PROOT_ROOTFS}/${PROOT_DISTRO}/home/${username}/.config"
+    local config_dst="${PROOT_ROOTFS}/home/${username}/.config"
 
     if [ ! -d "${config_dst}/conky" ]; then
         mkdir -p "$config_dst"
@@ -389,8 +389,8 @@ FANCYBASH
 
 _setup_proot_sudoers() {
     local username="$1"
-    local sudoers="${PROOT_ROOTFS}/${PROOT_DISTRO}/etc/sudoers"
-    local sudoers_d="${PROOT_ROOTFS}/${PROOT_DISTRO}/etc/sudoers.d"
+    local sudoers="${PROOT_ROOTFS}/etc/sudoers"
+    local sudoers_d="${PROOT_ROOTFS}/etc/sudoers.d"
 
     if [ ! -f "$sudoers" ]; then
         # sudo 미설치(Arch 기본): sudoers.d에 미리 작성 → sudo 설치 후 활성화
@@ -416,7 +416,7 @@ _setup_proot_sudoers() {
 }
 
 _setup_ubuntu_korean_locale() {
-    local profile="${PROOT_ROOTFS}/${PROOT_DISTRO}/home/${PROOT_USER}/.profile"
+    local profile="${PROOT_ROOTFS}/home/${PROOT_USER}/.profile"
     grep -q "# termux-xfce-korean" "$profile" 2>/dev/null && return 0
 
     cat >> "$profile" << 'EOF'
@@ -432,7 +432,7 @@ command -v nimf &>/dev/null && { nimf & disown; } 2>/dev/null
 EOF
 
     # /etc/default/locale
-    cat > "${PROOT_ROOTFS}/${PROOT_DISTRO}/etc/default/locale" << 'EOF'
+    cat > "${PROOT_ROOTFS}/etc/default/locale" << 'EOF'
 LANG=ko_KR.UTF-8
 LANGUAGE=ko_KR.UTF-8
 EOF
@@ -533,7 +533,7 @@ EOF
 }
 
 _setup_arch_korean_locale() {
-    local locale_gen="${PROOT_ROOTFS}/${PROOT_DISTRO}/etc/locale.gen"
+    local locale_gen="${PROOT_ROOTFS}/etc/locale.gen"
     grep -q "ko_KR.UTF-8" "$locale_gen" 2>/dev/null || \
         echo "ko_KR.UTF-8 UTF-8" >> "$locale_gen"
     proot_exec_root locale-gen
